@@ -12,9 +12,10 @@ interface Props {
   user: { name: string; image?: string | null }
   repos: Repo[]
   errors?: Record<string, string>
+  values?: Record<string, string>
 }
 
-const NewProject: FC<Props> = ({ user, repos, errors = {} }) => (
+const NewProject: FC<Props> = ({ user, repos = [], errors = {}, values = {} }) => (
   <AppShell user={user}>
     <div class="max-w-xl">
       <a href="/dashboard" class="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1 mb-6">
@@ -85,8 +86,9 @@ const NewProject: FC<Props> = ({ user, repos, errors = {} }) => (
         </div>
 
         <form method="post" action="/projects/new" class="space-y-4">
-          <input type="hidden" name="repoOwner" id="f-owner" />
-          <input type="hidden" name="repoName" id="f-name" />
+          <input type="hidden" name="repoOwner" id="f-owner" value={values.repoOwner ?? ''} />
+          <input type="hidden" name="repoName" id="f-name" value={values.repoName ?? ''} />
+          <input type="hidden" name="name" id="f-project-name" value={values.repoName ?? ''} />
 
           <Field label="Docs folder" name="docsFolder" id="f-docs" placeholder="docs" defaultValue="docs"
             hint="Folder containing your .md files" error={errors.docsFolder} />
@@ -112,6 +114,7 @@ const NewProject: FC<Props> = ({ user, repos, errors = {} }) => (
       function selectRepo(owner, name) {
         document.getElementById('f-owner').value = owner
         document.getElementById('f-name').value = name
+        document.getElementById('f-project-name').value = name
         document.getElementById('selected-display').textContent = owner + '/' + name
         document.getElementById('f-slug').value = toSlug(name)
         document.getElementById('step-pick').style.display = 'none'
@@ -128,6 +131,17 @@ const NewProject: FC<Props> = ({ user, repos, errors = {} }) => (
           el.style.display = el.dataset.repo.includes(q.toLowerCase()) ? '' : 'none'
         })
       }
+
+      // If repoOwner is pre-filled (server-side re-render after error), jump to step 2
+      window.addEventListener('DOMContentLoaded', () => {
+        const owner = document.getElementById('f-owner').value
+        const name = document.getElementById('f-name').value
+        if (owner && name) {
+          document.getElementById('selected-display').textContent = owner + '/' + name
+          document.getElementById('step-pick').style.display = 'none'
+          document.getElementById('step-configure').style.display = 'block'
+        }
+      })
     `}} />
   </AppShell>
 )

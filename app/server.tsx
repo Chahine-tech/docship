@@ -147,6 +147,7 @@ app.post('/projects/new', async (c) => {
     )
     return c.render('dashboard/NewProject', {
       user: { name: session.user.name, image: session.user.image },
+      repos: [],
       errors,
       values: raw,
     })
@@ -157,6 +158,7 @@ app.post('/projects/new', async (c) => {
   if (existing) {
     return c.render('dashboard/NewProject', {
       user: { name: session.user.name, image: session.user.image },
+      repos: [],
       errors: { slug: 'Slug already taken' },
       values: raw,
     })

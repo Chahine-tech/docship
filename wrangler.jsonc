@@ -3,7 +3,7 @@
   "name": "docship",
   "compatibility_date": "2025-08-03",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "./app/server.ts",
+  "main": "./app/server.tsx",
 
   // D1 — relational data (projects, versions, pages, auth tables)
   "d1_databases": [

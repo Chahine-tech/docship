@@ -36,6 +36,12 @@ export class GitHubClient {
     return res.json() as Promise<T>
   }
 
+  async getUserRepos(): Promise<GithubRepo[]> {
+    return this.request<GithubRepo[]>(
+      '/user/repos?type=all&sort=updated&per_page=100'
+    )
+  }
+
   async resolveTagToCommitSha(owner: string, repo: string, tag: string): Promise<string> {
     const ref = await this.request<{ object: { sha: string; type: string } }>(
       `/repos/${owner}/${repo}/git/ref/tags/${tag}`
@@ -94,6 +100,15 @@ export class GitHubClient {
 
     return results
   }
+}
+
+export interface GithubRepo {
+  id: number
+  name: string
+  full_name: string
+  private: boolean
+  description: string | null
+  owner: { login: string }
 }
 
 export class GitHubApiError extends Error {

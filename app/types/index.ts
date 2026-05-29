@@ -12,11 +12,11 @@ export interface Env {
 export interface BuildJob {
   projectId: string
   versionId: string
+  userId: string
   tag: string
   repoOwner: string
   repoName: string
   docsFolder: string
-  githubToken: string
 }
 
 export interface NavItem {

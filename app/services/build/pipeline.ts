@@ -2,8 +2,9 @@ import { GitHubClient } from '../github/client'
 import { parseMarkdown } from './parser'
 import { buildNavTree, extractFileMetadata } from './navigation'
 import { storePage, storeNav, storeLatestVersion } from './kv'
+import { decryptToken } from '../crypto'
 import { getDb } from '../../db/client'
-import { docVersions, docPages, projects } from '../../db/schema'
+import { docVersions, docPages, projects, accounts } from '../../db/schema'
 import { eq, and } from 'drizzle-orm'
 import type { BuildJob, Env } from '../../types'
 
@@ -16,7 +17,17 @@ export async function runBuildPipeline(job: BuildJob, env: Env): Promise<void> {
     .where(eq(docVersions.id, job.versionId))
 
   try {
-    const github = new GitHubClient(job.githubToken)
+    // Fetch and decrypt the token here, in the consumer — never stored in the queue message
+    const account = await db
+      .select({ accessToken: accounts.accessToken })
+      .from(accounts)
+      .where(and(eq(accounts.userId, job.userId), eq(accounts.providerId, 'github')))
+      .get()
+
+    if (!account?.accessToken) throw new Error(`No GitHub token found for user ${job.userId}`)
+
+    const githubToken = await decryptToken(account.accessToken, env.TOKEN_ENCRYPTION_KEY)
+    const github = new GitHubClient(githubToken)
 
     // 1. Resolve tag → commit SHA (handles both lightweight and annotated tags)
     const commitSha = await github.resolveTagToCommitSha(

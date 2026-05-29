@@ -3,7 +3,6 @@ import { verifyGitHubSignature } from './verify'
 import { getDb } from '../../db/client'
 import { projects, docVersions, accounts } from '../../db/schema'
 import { eq, and } from 'drizzle-orm'
-import { decryptToken } from '../../services/crypto'
 import type { Env, GitHubPushPayload } from '../../types'
 
 const webhooks = new Hono<{ Bindings: Env }>()
@@ -60,20 +59,19 @@ webhooks.post('/', async (c) => {
     return c.json({ message: 'already processed', versionId: existing.id, status: existing.status })
   }
 
-  // Retrieve the owner's GitHub access token (stored by Better Auth)
-  const account = await db
-    .select({ accessToken: accounts.accessToken })
+  // Verify the project owner actually has a GitHub token before queuing
+  const hasToken = await db
+    .select({ id: accounts.id })
     .from(accounts)
     .where(and(eq(accounts.userId, project.userId), eq(accounts.providerId, 'github')))
     .get()
 
-  if (!account?.accessToken) {
+  if (!hasToken) {
     return c.json({ error: 'no GitHub token on file for project owner' }, 422)
   }
 
-  const githubToken = await decryptToken(account.accessToken, c.env.TOKEN_ENCRYPTION_KEY)
-
-  // Create the version record and enqueue the build
+  // Create the version record and enqueue the build.
+  // userId is sent instead of the token — the consumer fetches and decrypts it at build time.
   const versionId = crypto.randomUUID()
 
   await db.insert(docVersions).values({
@@ -88,11 +86,11 @@ webhooks.post('/', async (c) => {
   await c.env.BUILD_QUEUE.send({
     projectId: project.id,
     versionId,
+    userId: project.userId,
     tag,
     repoOwner,
     repoName,
     docsFolder: project.docsFolder,
-    githubToken,
   })
 
   return c.json({ ok: true, versionId }, 202)

@@ -49,15 +49,27 @@ export async function runBuildPipeline(job: BuildJob, env: Env): Promise<void> {
       (f) => f.type === 'blob' && f.path.startsWith(docsPrefix) && f.path.endsWith('.md')
     )
 
-    if (mdFiles.length === 0) {
+    // Also look for root README.md as a fallback homepage
+    const rootReadme = tree.tree.find(
+      (f) => f.type === 'blob' && /^readme\.md$/i.test(f.path)
+    )
+
+    if (mdFiles.length === 0 && !rootReadme) {
       throw new Error(`No markdown files found in "${job.docsFolder}" at tag ${job.tag}`)
     }
 
     // 4. Fetch all file contents with bounded concurrency
+    const filesToFetch = [...mdFiles]
+    const hasRootIndex = mdFiles.some((f) => {
+      const rel = f.path.slice(docsPrefix.length)
+      return /^(index|readme)\.md$/i.test(rel)
+    })
+    if (rootReadme && !hasRootIndex) filesToFetch.push(rootReadme)
+
     const contentMap = await github.getBlobsWithConcurrency(
       job.repoOwner,
       job.repoName,
-      mdFiles,
+      filesToFetch,
       5
     )
 
@@ -77,13 +89,19 @@ export async function runBuildPipeline(job: BuildJob, env: Env): Promise<void> {
 
     const pageInserts: (typeof docPages.$inferInsert)[] = []
 
-    for (const file of mdFiles) {
+    for (const file of filesToFetch) {
       const content = contentMap.get(file.path)
       if (!content) continue
 
-      // Path relative to the docs folder, e.g. "api/authentication.md"
-      const relativePath = file.path.slice(docsPrefix.length)
-      const urlPath = '/' + relativePath.replace(/\.md$/, '').replace(/\/index$/, '')
+      // Root README.md gets path "/"
+      const isRootReadme = rootReadme && file.path === rootReadme.path && !hasRootIndex
+      const relativePath = isRootReadme ? 'index.md' : file.path.slice(docsPrefix.length)
+
+      const parts = relativePath.replace(/\.md$/i, '').split('/')
+      const lastPart = parts[parts.length - 1].toLowerCase()
+      const isIndexFile = lastPart === 'index' || lastPart === 'readme'
+      const urlParts = isIndexFile ? parts.slice(0, -1) : parts
+      const urlPath = urlParts.length > 0 ? '/' + urlParts.join('/') : '/'
 
       const { title, order } = extractFileMetadata(content, relativePath)
       const parsed = await parseMarkdown(content, title)

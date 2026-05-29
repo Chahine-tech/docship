@@ -194,6 +194,72 @@ app.get('/projects/:id', async (c) => {
   })
 })
 
+const settingsSchema = z.object({
+  name: z.string().min(1).max(100),
+  docsFolder: z.string().min(1),
+  isPrivate: z.string().optional(),
+})
+
+app.get('/projects/:id/settings', async (c) => {
+  const session = await getSession(c)
+  if (!session) return c.redirect('/login')
+
+  const db = getDb(c.env.DB)
+  const project = await db
+    .select().from(projects)
+    .where(and(eq(projects.id, c.req.param('id')), eq(projects.userId, session.user.id)))
+    .get()
+
+  if (!project) return c.notFound()
+
+  return c.render('dashboard/ProjectSettings', {
+    user: { name: session.user.name, image: session.user.image },
+    project,
+  })
+})
+
+app.post('/projects/:id/settings', async (c) => {
+  const session = await getSession(c)
+  if (!session) return c.redirect('/login')
+
+  const db = getDb(c.env.DB)
+  const project = await db
+    .select().from(projects)
+    .where(and(eq(projects.id, c.req.param('id')), eq(projects.userId, session.user.id)))
+    .get()
+
+  if (!project) return c.notFound()
+
+  const form = await c.req.formData()
+  const raw = Object.fromEntries(form) as Record<string, string>
+  const result = settingsSchema.safeParse(raw)
+
+  if (!result.success) {
+    const errors = Object.fromEntries(
+      Object.entries(result.error.flatten().fieldErrors).map(([k, v]) => [k, v?.[0] ?? ''])
+    )
+    return c.render('dashboard/ProjectSettings', {
+      user: { name: session.user.name, image: session.user.image },
+      project,
+      errors,
+    })
+  }
+
+  await db.update(projects)
+    .set({
+      name: result.data.name,
+      docsFolder: result.data.docsFolder,
+      isPrivate: result.data.isPrivate === 'true',
+    })
+    .where(eq(projects.id, project.id))
+
+  return c.render('dashboard/ProjectSettings', {
+    user: { name: session.user.name, image: session.user.image },
+    project: { ...project, ...result.data, isPrivate: result.data.isPrivate === 'true' },
+    success: true,
+  })
+})
+
 // ─── Docs (plain SSR, zero Inertia) ─────────────────────────────────
 app.get('/docs/:slug', async (c) => {
   const latest = await getLatestVersion(c.env.DOCS_KV, c.req.param('slug'))

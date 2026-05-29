@@ -19,9 +19,10 @@ export function buildNavTree(files: FileEntry[]): NavItem[] {
   })
 
   for (const file of sorted) {
-    const parts = file.path.replace(/\.md$/, '').split('/')
-    // index.md files serve as directory landing pages: guide/index.md → /guide
-    const urlParts = parts[parts.length - 1] === 'index' ? parts.slice(0, -1) : parts
+    const parts = file.path.replace(/\.md$/i, '').split('/')
+    const lastPart = parts[parts.length - 1].toLowerCase()
+    const isIndexFile = lastPart === 'index' || lastPart === 'readme'
+    const urlParts = isIndexFile ? parts.slice(0, -1) : parts
     const urlPath = urlParts.length > 0 ? '/' + urlParts.join('/') : '/'
 
     if (parts.length === 1) {

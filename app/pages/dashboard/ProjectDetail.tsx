@@ -39,15 +39,23 @@ const ProjectDetail: FC<Props> = ({ user, project, versions }) => (
             {project.repoOwner}/{project.repoName} · /{project.docsFolder}
           </p>
         </div>
-        {versions.some((v) => v.status === 'ready') && (
+        <div class="flex items-center gap-2">
+          {versions.some((v) => v.status === 'ready') && (
+            <a
+              href={`/docs/${project.slug}`}
+              target="_blank"
+              class="inline-flex items-center gap-2 h-9 px-4 rounded-md border border-border bg-card text-sm hover:bg-accent transition-colors"
+            >
+              View docs ↗
+            </a>
+          )}
           <a
-            href={`/docs/${project.slug}`}
-            target="_blank"
+            href={`/projects/${project.id}/settings`}
             class="inline-flex items-center gap-2 h-9 px-4 rounded-md border border-border bg-card text-sm hover:bg-accent transition-colors"
           >
-            View docs ↗
+            Settings
           </a>
-        )}
+        </div>
       </div>
     </div>
 

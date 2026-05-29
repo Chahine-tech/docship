@@ -4,6 +4,7 @@ import type { NavItem } from '../../types'
 
 interface Props {
   projectSlug: string
+  projectId?: string
   currentVersion: string
   versions: { tag: string; isLatest: boolean }[]
   nav: NavItem[]
@@ -13,7 +14,7 @@ interface Props {
 }
 
 export const DocsLayout: FC<Props> = ({
-  projectSlug, currentVersion, versions, nav, currentPath, pageTitle, children,
+  projectSlug, projectId, currentVersion, versions, nav, currentPath, pageTitle, children,
 }) => (
   <html lang="en">
     <head>
@@ -27,7 +28,7 @@ export const DocsLayout: FC<Props> = ({
       <div class="min-h-screen flex flex-col">
         {/* Header */}
         <header class="h-14 border-b border-border bg-sidebar flex items-center px-6 gap-4 shrink-0 sticky top-0 z-10 backdrop-blur-sm">
-          <a href={`/docs/${projectSlug}`} class="text-sm font-semibold tracking-tight">
+          <a href={projectId ? `/projects/${projectId}` : `/docs/${projectSlug}`} class="text-sm font-semibold tracking-tight">
             {projectSlug}
           </a>
           <div class="flex-1" />

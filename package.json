@@ -13,7 +13,8 @@
     "db:studio": "drizzle-kit studio",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "webhook": "smee --target http://localhost:5173/webhooks/github"
   },
   "dependencies": {
     "@hono/inertia": "^0.2.0",
@@ -46,6 +47,7 @@
     "vite": "^8.0.10",
     "vite-ssr-components": "^0.6.1",
     "vitest": "^4.1.7",
+    "smee-client": "^5.0.0",
     "wrangler": "^4.17.0"
   }
 }

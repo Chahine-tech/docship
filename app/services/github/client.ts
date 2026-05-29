@@ -69,7 +69,9 @@ export class GitHubClient {
     )
 
     if (blob.encoding === 'base64') {
-      return atob(blob.content.replace(/\n/g, ''))
+      const binary = atob(blob.content.replace(/\n/g, ''))
+      const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0))
+      return new TextDecoder('utf-8').decode(bytes)
     }
     return blob.content
   }

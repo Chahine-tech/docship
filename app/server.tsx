@@ -212,7 +212,8 @@ app.get('/docs/:slug/:version', async (c) => {
 
 app.get('/docs/:slug/:version/*', async (c) => {
   const { slug, version } = c.req.param()
-  const path = '/' + c.req.param('*')
+  const prefix = `/docs/${slug}/${version}`
+  const path = c.req.path.slice(prefix.length) || '/'
 
   const db = getDb(c.env.DB)
   const [page, nav] = await Promise.all([
@@ -233,6 +234,7 @@ app.get('/docs/:slug/:version/*', async (c) => {
   const html = renderToString(
     <DocsLayout
       projectSlug={slug}
+      projectId={project?.id}
       currentVersion={version}
       versions={versions}
       nav={nav ?? []}

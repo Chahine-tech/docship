@@ -1,0 +1,54 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "docship",
+  "compatibility_date": "2025-08-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "./app/server.ts",
+
+  // D1 — relational data (projects, versions, pages, auth tables)
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "docship-db",
+      "database_id": "4d775924-87a5-4a8f-b9b8-b7bc052ce2f0",
+      "migrations_dir": "app/db/migrations"
+    }
+  ],
+
+  // KV — doc content and navigation trees
+  "kv_namespaces": [
+    {
+      "binding": "DOCS_KV",
+      "id": "4a14a3bf82e3455c81e9f3357422c47f",
+      "preview_id": "10bb7b1f50f54f8b9204432b01c7233e"
+    }
+  ],
+
+  // Queues — async build pipeline
+  "queues": {
+    "producers": [
+      {
+        "queue": "docship-build-queue",
+        "binding": "BUILD_QUEUE"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "docship-build-queue",
+        "max_batch_size": 1,
+        "max_retries": 3,
+        "dead_letter_queue": "docship-build-dlq"
+      }
+    ]
+  },
+
+  // Secrets — set via `wrangler secret put <NAME>`
+  // GITHUB_CLIENT_ID
+  // GITHUB_CLIENT_SECRET
+  // BETTER_AUTH_SECRET
+  // APP_URL
+
+  "vars": {
+    "APP_URL": "http://localhost:5173"
+  }
+}

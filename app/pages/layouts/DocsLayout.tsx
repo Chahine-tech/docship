@@ -65,6 +65,20 @@ export const DocsLayout: FC<Props> = ({
           window.location.href = '/docs/' + this.dataset.slug + '/' + this.value;
         });
       `}} />
+      <script type="module" dangerouslySetInnerHTML={{ __html: `
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+        for (const el of document.querySelectorAll('code.language-mermaid')) {
+          try {
+            const id = 'mermaid-' + Math.random().toString(36).slice(2);
+            const { svg } = await mermaid.render(id, el.textContent ?? '');
+            const div = document.createElement('div');
+            div.className = 'my-4 overflow-x-auto';
+            div.innerHTML = svg;
+            el.parentElement.replaceWith(div);
+          } catch {}
+        }
+      `}} />
     </body>
   </html>
 )

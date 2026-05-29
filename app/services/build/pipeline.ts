@@ -104,7 +104,15 @@ export async function runBuildPipeline(job: BuildJob, env: Env): Promise<void> {
       const urlPath = urlParts.length > 0 ? '/' + urlParts.join('/') : '/'
 
       const { title, order } = extractFileMetadata(content, relativePath)
-      const parsed = await parseMarkdown(content, title)
+      const parsed = await parseMarkdown(content, title, {
+        owner: job.repoOwner,
+        repo: job.repoName,
+        tag: job.tag,
+        filePath: isRootReadme ? 'README.md' : file.path,
+        docsFolder: job.docsFolder,
+        slug,
+        version: job.tag,
+      })
 
       const kvKey = `page:${slug}:${job.tag}:${urlPath}`
       await storePage(env.DOCS_KV, slug, job.tag, urlPath, parsed)

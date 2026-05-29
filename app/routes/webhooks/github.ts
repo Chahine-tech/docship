@@ -3,6 +3,7 @@ import { verifyGitHubSignature } from './verify'
 import { getDb } from '../../db/client'
 import { projects, docVersions, accounts } from '../../db/schema'
 import { eq, and } from 'drizzle-orm'
+import { decryptToken } from '../../services/crypto'
 import type { Env, GitHubPushPayload } from '../../types'
 
 const webhooks = new Hono<{ Bindings: Env }>()
@@ -70,6 +71,8 @@ webhooks.post('/', async (c) => {
     return c.json({ error: 'no GitHub token on file for project owner' }, 422)
   }
 
+  const githubToken = await decryptToken(account.accessToken, c.env.TOKEN_ENCRYPTION_KEY)
+
   // Create the version record and enqueue the build
   const versionId = crypto.randomUUID()
 
@@ -89,7 +92,7 @@ webhooks.post('/', async (c) => {
     repoOwner,
     repoName,
     docsFolder: project.docsFolder,
-    githubToken: account.accessToken,
+    githubToken,
   })
 
   return c.json({ ok: true, versionId }, 202)

@@ -5,6 +5,7 @@ export interface Env {
   GITHUB_CLIENT_ID: string
   GITHUB_CLIENT_SECRET: string
   BETTER_AUTH_SECRET: string
+  TOKEN_ENCRYPTION_KEY: string
   APP_URL: string
 }
 

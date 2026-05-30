@@ -77,8 +77,9 @@ const Analytics: FC<Props> = ({ user, project, stats }) => {
                   <div class="flex-1 min-w-0">
                     <a
                       href={`/docs/${project.slug}${p.path}`}
-                      class="text-sm font-mono text-muted-foreground hover:text-foreground transition-colors truncate block"
+                      class="inline-flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors truncate group"
                     >
+                      <span class="text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0">↗</span>
                       {p.path}
                     </a>
                     <div class="mt-1.5 h-1 rounded-full bg-muted overflow-hidden">
@@ -105,9 +106,12 @@ const Analytics: FC<Props> = ({ user, project, stats }) => {
           ) : (
             <ul class="divide-y divide-border">
               {stats.topSearches.map((s) => (
-                <li key={s.query} class="px-6 py-3 flex items-center justify-between gap-3">
-                  <span class="text-sm font-mono truncate">{s.query}</span>
-                  <span class="text-sm text-muted-foreground tabular-nums shrink-0">{s.total}×</span>
+                <li key={s.query} class="px-6 py-3 flex items-center justify-between gap-3 hover:bg-accent/30 transition-colors">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="text-muted-foreground/40 text-xs shrink-0">⌕</span>
+                    <span class="text-sm truncate">{s.query}</span>
+                  </div>
+                  <span class="text-xs font-medium bg-muted px-2 py-0.5 rounded-full tabular-nums shrink-0 text-muted-foreground">{s.total}</span>
                 </li>
               ))}
             </ul>

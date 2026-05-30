@@ -34,7 +34,7 @@ export const Landing: FC = () => (
       {/* Hero */}
       <section class="max-w-4xl mx-auto px-6 pt-24 pb-16 text-center">
         <div class="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground mb-8">
-          <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+          <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
           Git-native · Edge-hosted · Zero config
         </div>
         <h1 class="text-5xl font-bold tracking-tight text-foreground mb-6 leading-tight">

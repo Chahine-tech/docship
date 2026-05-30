@@ -72,7 +72,7 @@ const ProjectCard: FC<{ project: Project }> = ({ project: p }) => (
 
 const StatusBadge: FC<{ status: string; tag: string }> = ({ status, tag }) => {
   const dots: Record<string, string> = {
-    ready: 'bg-emerald-400', building: 'bg-blue-400 animate-pulse',
+    ready: 'bg-emerald-400 animate-pulse', building: 'bg-blue-400 animate-pulse',
     queued: 'bg-yellow-400', error: 'bg-red-400',
   }
   const colors: Record<string, string> = {

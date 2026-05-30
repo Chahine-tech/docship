@@ -107,7 +107,7 @@ export default ProjectDetail
 
 const VersionRow: FC<{ version: Version; slug: string }> = ({ version: v, slug }) => {
   const dots: Record<string, string> = {
-    ready: 'bg-emerald-400', building: 'bg-blue-400 animate-pulse',
+    ready: 'bg-emerald-400 animate-pulse', building: 'bg-blue-400 animate-pulse',
     queued: 'bg-yellow-400', error: 'bg-red-400',
   }
   return (

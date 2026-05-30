@@ -48,6 +48,21 @@ export const DocsLayout: FC<Props> = ({
         <div class="flex flex-1 overflow-hidden">
           {/* Sidebar */}
           <aside class="w-60 shrink-0 border-r border-border bg-sidebar overflow-y-auto py-6 px-3 hidden lg:block">
+            <div class="relative mb-4 px-1">
+              <input
+                id="doc-search-input"
+                type="search"
+                placeholder="Search..."
+                autocomplete="off"
+                data-slug={projectSlug}
+                data-version={currentVersion}
+                class="w-full h-8 rounded-md border border-border bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground"
+              />
+              <div
+                id="doc-search-results"
+                class="hidden absolute top-full left-1 right-1 mt-1 bg-card border border-border rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto"
+              />
+            </div>
             <SidebarNav items={nav} slug={projectSlug} version={currentVersion} currentPath={currentPath} />
           </aside>
 
@@ -64,6 +79,48 @@ export const DocsLayout: FC<Props> = ({
         document.getElementById('version-switcher')?.addEventListener('change', function() {
           window.location.href = '/docs/' + this.dataset.slug + '/' + this.value;
         });
+
+        (function() {
+          const input = document.getElementById('doc-search-input');
+          const results = document.getElementById('doc-search-results');
+          if (!input || !results) return;
+
+          const slug = input.dataset.slug;
+          const version = input.dataset.version;
+          const urlToken = new URLSearchParams(window.location.search).get('token');
+
+          let timer;
+          input.addEventListener('input', function() {
+            clearTimeout(timer);
+            const q = this.value.trim();
+            if (q.length < 2) { results.classList.add('hidden'); return; }
+            timer = setTimeout(async () => {
+              try {
+                const params = new URLSearchParams({ q, version });
+                if (urlToken) params.set('token', urlToken);
+                const res = await fetch('/docs/' + slug + '/search?' + params);
+                const { results: hits } = await res.json();
+                if (!hits?.length) {
+                  results.innerHTML = '<div class="px-4 py-3 text-sm text-muted-foreground">No results.</div>';
+                } else {
+                  results.innerHTML = hits.map(r =>
+                    '<a href="/docs/' + slug + '/' + version + r.path + (urlToken ? '?token=' + encodeURIComponent(urlToken) : '') + '" class="block px-4 py-2.5 hover:bg-accent border-b border-border last:border-0 transition-colors">' +
+                      '<div class="text-sm font-medium truncate">' + r.title + '</div>' +
+                      '<div class="text-xs text-muted-foreground line-clamp-2 mt-0.5">' + r.snippet + '</div>' +
+                    '</a>'
+                  ).join('');
+                }
+                results.classList.remove('hidden');
+              } catch {}
+            }, 300);
+          });
+
+          document.addEventListener('click', (e) => {
+            if (!input.contains(e.target) && !results.contains(e.target)) {
+              results.classList.add('hidden');
+            }
+          });
+        })();
       `}} />
       <script type="module" dangerouslySetInnerHTML={{ __html: `
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';

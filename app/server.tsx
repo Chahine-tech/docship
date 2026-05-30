@@ -13,7 +13,7 @@ import { webhooks } from './routes/webhooks/github'
 import { GitHubClient } from './services/github/client'
 import { decryptToken } from './services/crypto'
 import { accounts } from './db/schema'
-import { getPage, getNav, getLatestVersion } from './services/build/kv'
+import { getPage, getNav, getLatestVersion, getAgentContext } from './services/build/kv'
 import { queue } from './consumer'
 import { rootView } from './root-view'
 import { Landing } from './pages/Landing'
@@ -245,22 +245,89 @@ app.post('/projects/:id/settings', async (c) => {
     })
   }
 
-  await db.update(projects)
-    .set({
-      name: result.data.name,
-      docsFolder: result.data.docsFolder,
-      isPrivate: result.data.isPrivate === 'true',
-    })
-    .where(eq(projects.id, project.id))
+  const updated = {
+    name: result.data.name,
+    docsFolder: result.data.docsFolder,
+    isPrivate: result.data.isPrivate === 'true',
+  }
+
+  await db.update(projects).set(updated).where(eq(projects.id, project.id))
 
   return c.render('dashboard/ProjectSettings', {
     user: { name: session.user.name, image: session.user.image },
-    project: { ...project, ...result.data, isPrivate: result.data.isPrivate === 'true' },
+    project: { ...project, ...updated },
     success: true,
   })
 })
 
 // ─── Docs (plain SSR, zero Inertia) ─────────────────────────────────
+
+// GET /docs/:slug/llms.txt — agent-friendly context (latest version)
+app.get('/docs/:slug/llms.txt', async (c) => {
+  const { slug } = c.req.param()
+  const db = getDb(c.env.DB)
+
+  const project = await db
+    .select({ isPrivate: projects.isPrivate, readToken: projects.readToken })
+    .from(projects)
+    .where(eq(projects.slug, slug))
+    .get()
+
+  if (!project) return c.notFound()
+  if (!(await canAccessDocs(c, project))) return c.redirect('/login')
+
+  const latest = await getLatestVersion(c.env.DOCS_KV, slug)
+  if (!latest) return c.notFound()
+
+  const text = await getAgentContext(c.env.DOCS_KV, slug, latest)
+  if (!text) return c.notFound()
+
+  return c.text(text, 200, { 'Content-Type': 'text/plain; charset=utf-8' })
+})
+
+// GET /docs/:slug/search — full-text search (JSON)
+app.get('/docs/:slug/search', async (c) => {
+  const { slug } = c.req.param()
+  const q = c.req.query('q')?.trim() ?? ''
+  const version = c.req.query('version')
+
+  if (q.length < 2) return c.json({ results: [] })
+
+  const db = getDb(c.env.DB)
+  const project = await db
+    .select({ isPrivate: projects.isPrivate, readToken: projects.readToken })
+    .from(projects)
+    .where(eq(projects.slug, slug))
+    .get()
+
+  if (!project) return c.notFound()
+  if (!(await canAccessDocs(c, project))) return c.json({ error: 'unauthorized' }, 401)
+
+  const searchVersion = version ?? (await getLatestVersion(c.env.DOCS_KV, slug))
+  if (!searchVersion) return c.json({ results: [] })
+
+  const ftsQuery = buildFtsQuery(q)
+  if (!ftsQuery) return c.json({ results: [] })
+
+  try {
+    const { results } = await c.env.DB
+      .prepare(
+        `SELECT path, title,
+           snippet(doc_search, 4, '<mark>', '</mark>', '…', 32) AS snippet
+         FROM doc_search
+         WHERE doc_search MATCH ? AND slug = ? AND version = ?
+         ORDER BY rank
+         LIMIT 10`
+      )
+      .bind(ftsQuery, slug, searchVersion)
+      .all<{ path: string; title: string; snippet: string }>()
+
+    return c.json({ results })
+  } catch {
+    return c.json({ results: [] })
+  }
+})
+
 app.get('/docs/:slug', async (c) => {
   const latest = await getLatestVersion(c.env.DOCS_KV, c.req.param('slug'))
   if (!latest) return c.notFound()
@@ -282,6 +349,16 @@ app.get('/docs/:slug/:version/*', async (c) => {
   const path = c.req.path.slice(prefix.length) || '/'
 
   const db = getDb(c.env.DB)
+
+  const project = await db
+    .select({ id: projects.id, isPrivate: projects.isPrivate, readToken: projects.readToken })
+    .from(projects)
+    .where(eq(projects.slug, slug))
+    .get()
+
+  // Check private access before fetching content
+  if (project && !(await canAccessDocs(c, project))) return c.redirect('/login')
+
   const [page, nav] = await Promise.all([
     getPage(c.env.DOCS_KV, slug, version, path),
     getNav(c.env.DOCS_KV, slug, version),
@@ -289,9 +366,9 @@ app.get('/docs/:slug/:version/*', async (c) => {
 
   if (!page) return c.notFound()
 
-  const project = await db.select({ id: projects.id }).from(projects).where(eq(projects.slug, slug)).get()
   const versions = project
-    ? await db.select({ tag: docVersions.tag, isLatest: docVersions.isLatest })
+    ? await db
+        .select({ tag: docVersions.tag, isLatest: docVersions.isLatest })
         .from(docVersions)
         .where(and(eq(docVersions.projectId, project.id), eq(docVersions.status, 'ready')))
         .all()
@@ -321,6 +398,39 @@ function findFirstPath(nav: NavItem[]): string | undefined {
     if (item.path) return item.path
     if (item.children) { const f = findFirstPath(item.children); if (f) return f }
   }
+}
+
+function getDocToken(c: Context<AppEnv>): string | undefined {
+  const fromQuery = c.req.query('token')
+  const auth = c.req.header('Authorization')
+  return fromQuery ?? (auth?.startsWith('Bearer ') ? auth.slice(7) : undefined)
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let result = 0
+  for (let i = 0; i < a.length; i++) result |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return result === 0
+}
+
+async function canAccessDocs(
+  c: Context<AppEnv>,
+  project: { isPrivate: boolean; readToken: string | null }
+): Promise<boolean> {
+  if (!project.isPrivate) return true
+  const token = getDocToken(c)
+  if (token && project.readToken && timingSafeEqual(token, project.readToken)) return true
+  const session = await getSession(c)
+  return session !== null
+}
+
+function buildFtsQuery(q: string): string {
+  return q
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((term) => term.replace(/[^\p{L}\p{N}\-_]/gu, '') + '*')
+    .filter((t) => t.length > 1)
+    .join(' ')
 }
 
 export default { fetch: app.fetch, queue }

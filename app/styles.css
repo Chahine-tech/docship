@@ -69,5 +69,36 @@
 
     ul:has(input[type='checkbox']) { @apply list-none pl-0; }
     input[type='checkbox'] { @apply mr-2; }
+
+    /* Callouts / admonitions */
+    .callout {
+      @apply rounded-lg border px-4 py-3 mb-4 text-sm;
+
+      .callout-title {
+        @apply font-semibold mb-1 text-[0.8rem] uppercase tracking-wide;
+      }
+
+      p:last-child { @apply mb-0; }
+    }
+
+    .callout-note, .callout-info {
+      @apply bg-blue-950/40 border-blue-500/40;
+      .callout-title { @apply text-blue-400; }
+    }
+
+    .callout-tip {
+      @apply bg-emerald-950/40 border-emerald-500/40;
+      .callout-title { @apply text-emerald-400; }
+    }
+
+    .callout-warning {
+      @apply bg-amber-950/40 border-amber-500/40;
+      .callout-title { @apply text-amber-400; }
+    }
+
+    .callout-danger, .callout-caution {
+      @apply bg-red-950/40 border-red-500/40;
+      .callout-title { @apply text-red-400; }
+    }
   }
 }

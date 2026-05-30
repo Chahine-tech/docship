@@ -18,8 +18,8 @@ export const Landing: FC = () => (
         <a href="/login" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
           Sign in
         </a>
-        <a href="/login" class="inline-flex items-center h-8 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
-          Get started
+        <a href="/login/github" class="inline-flex items-center h-8 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
+          Get started free
         </a>
       </header>
 
@@ -34,12 +34,11 @@ export const Landing: FC = () => (
           <span class="text-muted-foreground">Your docs are live.</span>
         </h1>
         <p class="text-lg text-muted-foreground max-w-xl mx-auto mb-10">
-          Docship reads your <code class="text-foreground bg-muted rounded px-1.5 py-0.5 text-sm">.md</code> files directly from GitHub.
-          Push a tag and a new version of your docs is published automatically.
-          No CI. No deployment. No config file.
+          No Docusaurus. No CI pipeline. No separate repo.<br />
+          Docship reads your <code class="text-foreground bg-muted rounded px-1.5 py-0.5 text-sm">.md</code> files from GitHub and publishes a new version every time you push a tag.
         </p>
         <div class="flex items-center justify-center gap-4">
-          <a href="/login" class="inline-flex items-center gap-2 h-10 px-6 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors">
+          <a href="/login/github" class="inline-flex items-center gap-2 h-10 px-6 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors">
             <GithubIcon />
             Continue with GitHub
           </a>
@@ -51,7 +50,7 @@ export const Landing: FC = () => (
 
       {/* Demo block */}
       <section class="max-w-3xl mx-auto px-6 pb-20">
-        <div class="rounded-xl border border-border bg-card overflow-hidden">
+        <div class="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
           <div class="border-b border-border bg-sidebar px-4 py-2.5 flex items-center gap-2">
             <div class="flex gap-1.5">
               <span class="h-3 w-3 rounded-full bg-muted"></span>
@@ -63,26 +62,75 @@ export const Landing: FC = () => (
           <div class="p-6 font-mono text-sm space-y-1">
             <p><span class="text-muted-foreground">$ </span><span class="text-foreground">git tag v2.0.0 && git push --tags</span></p>
             <p class="text-muted-foreground">Enumerating objects: 3, done.</p>
-            <p class="text-muted-foreground">...</p>
-            <p><span class="text-emerald-400">✓</span> <span class="text-muted-foreground">docship.app/stripe-js/v2.0.0 is live</span></p>
+            <p class="text-muted-foreground">To github.com/your-org/your-repo.git</p>
+            <p class="text-muted-foreground"> * [new tag]   v2.0.0 → v2.0.0</p>
+            <p class="mt-3"><span class="text-emerald-400">✓</span> <span class="text-muted-foreground">docship.app/your-project/v2.0.0 is live</span></p>
           </div>
         </div>
       </section>
 
-      {/* Features */}
+      {/* How it works */}
       <section id="how" class="max-w-5xl mx-auto px-6 pb-24">
-        <h2 class="text-2xl font-bold text-center mb-12">Everything you need, nothing you don't</h2>
-        <div class="grid sm:grid-cols-3 gap-6">
+        <h2 class="text-2xl font-bold text-center mb-3">How it works</h2>
+        <p class="text-center text-muted-foreground mb-12 text-sm">Three steps. That's all.</p>
+        <div class="grid sm:grid-cols-3 gap-4 relative">
           {[
-            { title: 'Zero config', desc: 'Connect your repo, choose the docs folder. That\'s it. No docusaurus.config.js, no CI pipeline, no deploy step.' },
-            { title: 'Versioned by tags', desc: 'Push git tag v1.2.0 and a new docs version appears automatically. Switch between versions with a dropdown.' },
-            { title: 'Edge-hosted', desc: 'Docs are served from Cloudflare\'s edge network. Fast everywhere, for everyone — no cold starts.' },
-          ].map((f) => (
-            <div class="rounded-xl border border-border bg-card p-6">
-              <h3 class="font-semibold mb-2">{f.title}</h3>
-              <p class="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+            {
+              step: '01',
+              title: 'Connect your repo',
+              desc: 'Sign in with GitHub, pick a repo, choose the folder where your .md files live.',
+            },
+            {
+              step: '02',
+              title: 'Push a git tag',
+              desc: 'git tag v1.0.0 && git push --tags. Docship picks it up via webhook automatically.',
+            },
+            {
+              step: '03',
+              title: 'Docs are live',
+              desc: 'A versioned docs site is published instantly at docship.app/your-project. Switch versions with a dropdown.',
+            },
+          ].map((s) => (
+            <div class="rounded-xl border border-border bg-card p-6 relative">
+              <span class="text-4xl font-bold text-muted/30 absolute top-4 right-5 select-none">{s.step}</span>
+              <h3 class="font-semibold mb-2">{s.title}</h3>
+              <p class="text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* vs table */}
+      <section class="max-w-3xl mx-auto px-6 pb-24">
+        <h2 class="text-2xl font-bold text-center mb-12">Why not Docusaurus / GitBook?</h2>
+        <div class="rounded-xl border border-border overflow-hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-border bg-sidebar">
+                <th class="text-left px-5 py-3 font-medium text-muted-foreground"></th>
+                <th class="text-center px-5 py-3 font-semibold">Docship</th>
+                <th class="text-center px-5 py-3 font-medium text-muted-foreground">Docusaurus</th>
+                <th class="text-center px-5 py-3 font-medium text-muted-foreground">GitBook</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+              {[
+                ['Zero config', '✓', '✗', '✗'],
+                ['Auto-versioned by git tag', '✓', '✗', '~'],
+                ['Docs live in your repo', '✓', '✓', '✗'],
+                ['No CI pipeline needed', '✓', '✗', '✓'],
+                ['Edge-hosted, fast everywhere', '✓', '✗', '✗'],
+                ['Free to start', '✓', '✓', '~'],
+              ].map(([feature, d, doc, gb]) => (
+                <tr>
+                  <td class="px-5 py-3 text-muted-foreground">{feature}</td>
+                  <td class="px-5 py-3 text-center font-medium text-emerald-400">{d}</td>
+                  <td class="px-5 py-3 text-center text-muted-foreground">{doc}</td>
+                  <td class="px-5 py-3 text-center text-muted-foreground">{gb}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -91,7 +139,7 @@ export const Landing: FC = () => (
         <div class="max-w-2xl mx-auto px-6 py-24 text-center">
           <h2 class="text-3xl font-bold mb-4">Ship better docs, faster.</h2>
           <p class="text-muted-foreground mb-8">Free for one project. No credit card required.</p>
-          <a href="/login" class="inline-flex items-center gap-2 h-10 px-6 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors">
+          <a href="/login/github" class="inline-flex items-center gap-2 h-10 px-6 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors">
             <GithubIcon />
             Get started with GitHub
           </a>

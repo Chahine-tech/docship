@@ -1,11 +1,13 @@
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
 import remarkGfm from 'remark-gfm'
+import remarkDirective from 'remark-directive'
 import remarkRehype from 'remark-rehype'
 import rehypeSlug from 'rehype-slug'
 import rehypeAutolinkHeadings from 'rehype-autolink-headings'
 import rehypeHighlight from 'rehype-highlight'
 import rehypeStringify from 'rehype-stringify'
+import { visit } from 'unist-util-visit'
 import type { PageContent } from '../../types'
 
 export interface BuildContext {
@@ -18,9 +20,39 @@ export interface BuildContext {
   version: string     // e.g. "v0.1.0"
 }
 
+const CALLOUT_TYPES = new Set(['note', 'tip', 'warning', 'danger', 'caution', 'info'])
+
+function remarkCallouts() {
+  return (tree: any) => {
+    visit(tree, 'containerDirective', (node: any) => {
+      if (!CALLOUT_TYPES.has(node.name)) return
+
+      // Extract custom label: :::warning[Custom Title]
+      let labelText = node.name.charAt(0).toUpperCase() + node.name.slice(1)
+      const first = node.children[0]
+      if (first?.data?.directiveLabel === true) {
+        labelText = first.children.map((c: any) => c.value ?? '').join('')
+        node.children = node.children.slice(1)
+      }
+
+      const data = (node.data ??= {})
+      data.hName = 'div'
+      data.hProperties = { class: `callout callout-${node.name}` }
+
+      node.children.unshift({
+        type: 'paragraph',
+        data: { hName: 'div', hProperties: { class: 'callout-title' } },
+        children: [{ type: 'text', value: labelText }],
+      })
+    })
+  }
+}
+
 const processor = unified()
   .use(remarkParse)
   .use(remarkGfm)
+  .use(remarkDirective)
+  .use(remarkCallouts)
   .use(remarkRehype, { allowDangerousHtml: true })
   .use(rehypeSlug)
   .use(rehypeAutolinkHeadings, { behavior: 'wrap' })

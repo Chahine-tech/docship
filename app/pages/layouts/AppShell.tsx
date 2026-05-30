@@ -16,11 +16,13 @@ export const AppShell: FC<Props> = ({ user, children }) => (
         <div class="flex items-center gap-4">
           <span class="text-sm text-muted-foreground">{user.name}</span>
           <div class="w-px h-4 bg-border" />
-          <form method="post" action="/api/auth/sign-out" class="flex items-center">
-            <button type="submit" class="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer leading-none">
-              Sign out
-            </button>
-          </form>
+          <button
+            type="button"
+            onclick="fetch('/api/auth/sign-out',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(()=>location.href='/login')"
+            class="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer leading-none"
+          >
+            Sign out
+          </button>
         </div>
       )}
     </header>

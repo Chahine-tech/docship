@@ -73,3 +73,25 @@ export async function getLatestVersion(
   if (!raw) return null
   return (JSON.parse(raw) as { version: string }).version
 }
+
+// Key schema: llms:{slug}:{version} → plain text llms.txt
+export function llmsKey(slug: string, version: string): string {
+  return `llms:${slug}:${version}`
+}
+
+export async function storeAgentContext(
+  kv: KVNamespace,
+  slug: string,
+  version: string,
+  text: string
+): Promise<void> {
+  await kv.put(llmsKey(slug, version), text)
+}
+
+export async function getAgentContext(
+  kv: KVNamespace,
+  slug: string,
+  version: string
+): Promise<string | null> {
+  return kv.get(llmsKey(slug, version))
+}

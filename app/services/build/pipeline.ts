@@ -1,7 +1,9 @@
 import { GitHubClient } from '../github/client'
 import { parseMarkdown } from './parser'
 import { buildNavTree, extractFileMetadata } from './navigation'
-import { storePage, storeNav, storeLatestVersion } from './kv'
+import { storePage, storeNav, storeLatestVersion, storeAgentContext } from './kv'
+import { buildLlmsTxt } from './llms'
+import type { LlmsFileEntry } from './llms'
 import { decryptToken } from '../crypto'
 import { getDb } from '../../db/client'
 import { docVersions, docPages, projects, accounts } from '../../db/schema'
@@ -75,7 +77,7 @@ export async function runBuildPipeline(job: BuildJob, env: Env): Promise<void> {
 
     // 5. Fetch the project slug for KV key construction
     const project = await db
-      .select({ slug: projects.slug })
+      .select({ slug: projects.slug, name: projects.name })
       .from(projects)
       .where(eq(projects.id, job.projectId))
       .get()
@@ -86,6 +88,9 @@ export async function runBuildPipeline(job: BuildJob, env: Env): Promise<void> {
 
     // 6. Parse each file and store in KV + D1
     const fileEntries: { path: string; title: string; order: number }[] = []
+    const rawDocsMap = new Map<string, string>()
+    const llmsFileEntries: LlmsFileEntry[] = []
+    const ftsRows: { path: string; title: string; body: string }[] = []
 
     const pageInserts: (typeof docPages.$inferInsert)[] = []
 
@@ -117,7 +122,10 @@ export async function runBuildPipeline(job: BuildJob, env: Env): Promise<void> {
       const kvKey = `page:${slug}:${job.tag}:${urlPath}`
       await storePage(env.DOCS_KV, slug, job.tag, urlPath, parsed)
 
+      rawDocsMap.set(relativePath, content)
+      llmsFileEntries.push({ relativePath, title, urlPath })
       fileEntries.push({ path: relativePath, title, order })
+      ftsRows.push({ path: urlPath, title, body: htmlToPlainText(parsed.html) })
 
       pageInserts.push({
         id: crypto.randomUUID(),
@@ -138,7 +146,46 @@ export async function runBuildPipeline(job: BuildJob, env: Env): Promise<void> {
     const navTree = buildNavTree(fileEntries)
     await storeNav(env.DOCS_KV, slug, job.tag, navTree)
 
-    // 8. Determine if this is the latest version
+    // 8. Index pages into FTS (clear first for idempotent rebuilds)
+    await env.DB.prepare('DELETE FROM doc_search WHERE slug = ? AND version = ?')
+      .bind(slug, job.tag)
+      .run()
+    if (ftsRows.length > 0) {
+      await env.DB.batch(
+        ftsRows.map((row) =>
+          env.DB.prepare(
+            'INSERT INTO doc_search(slug, version, path, title, body) VALUES (?, ?, ?, ?, ?)'
+          ).bind(slug, job.tag, row.path, row.title, row.body)
+        )
+      )
+    }
+
+    // 9. Build and store agent context (llms.txt)
+    const agentFilesToFetch = tree.tree.filter(
+      (f) =>
+        f.type === 'blob' &&
+        (/^claude\.md$/i.test(f.path) ||
+          /^agents\.md$/i.test(f.path) ||
+          /^\.claude\/commands\/.+\.md$/i.test(f.path))
+    )
+    const agentContentMap =
+      agentFilesToFetch.length > 0
+        ? await github.getBlobsWithConcurrency(job.repoOwner, job.repoName, agentFilesToFetch, 5)
+        : new Map<string, string>()
+
+    const llmsTxt = buildLlmsTxt({
+      projectName: project.name,
+      repoOwner: job.repoOwner,
+      repoName: job.repoName,
+      slug,
+      tag: job.tag,
+      docContents: rawDocsMap,
+      fileEntries: llmsFileEntries,
+      agentFiles: agentContentMap,
+    })
+    await storeAgentContext(env.DOCS_KV, slug, job.tag, llmsTxt)
+
+    // 9. Determine if this is the latest version
     // A version is "latest" if no later tag exists with status=ready for this project
     const isLatest = await shouldBeLatest(db, job.projectId, job.versionId, job.tag)
 
@@ -197,6 +244,18 @@ async function shouldBeLatest(
 
   const isNewer = existing.every((v) => compareSemver(currentTag, v.tag) >= 0)
   return isNewer
+}
+
+function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 // Returns >0 if a > b, 0 if equal, <0 if a < b

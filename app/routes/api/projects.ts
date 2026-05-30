@@ -156,6 +156,45 @@ projectsRouter.get('/:id/versions', async (c) => {
   return c.json(versions)
 })
 
+// POST /api/projects/:id/read-token — generate or rotate the read token
+projectsRouter.post('/:id/read-token', async (c) => {
+  const db = getDb(c.env.DB)
+  const userId = c.get('userId')
+  const { id } = c.req.param()
+
+  const project = await db
+    .select({ id: projects.id })
+    .from(projects)
+    .where(and(eq(projects.id, id), eq(projects.userId, userId)))
+    .get()
+
+  if (!project) return c.json({ error: 'not found' }, 404)
+
+  const readToken = generateWebhookSecret()
+  await db.update(projects).set({ readToken }).where(eq(projects.id, id))
+
+  return c.json({ readToken })
+})
+
+// DELETE /api/projects/:id/read-token — revoke the read token
+projectsRouter.delete('/:id/read-token', async (c) => {
+  const db = getDb(c.env.DB)
+  const userId = c.get('userId')
+  const { id } = c.req.param()
+
+  const project = await db
+    .select({ id: projects.id })
+    .from(projects)
+    .where(and(eq(projects.id, id), eq(projects.userId, userId)))
+    .get()
+
+  if (!project) return c.json({ error: 'not found' }, 404)
+
+  await db.update(projects).set({ readToken: null }).where(eq(projects.id, id))
+
+  return c.body(null, 204)
+})
+
 // POST /api/projects/:id/webhook-secret — rotate the webhook secret
 projectsRouter.post('/:id/webhook-secret', async (c) => {
   const db = getDb(c.env.DB)

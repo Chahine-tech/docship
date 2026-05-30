@@ -43,4 +43,34 @@ describe('parseMarkdown', () => {
     expect(html).toContain('<code')
     expect(html).toContain('hljs')
   })
+
+  describe('callouts', () => {
+    it('renders :::warning callout with default title', async () => {
+      const content = ':::warning\nThis might break.\n:::'
+      const { html } = await parseMarkdown(content, 'Test')
+      expect(html).toContain('class="callout callout-warning"')
+      expect(html).toContain('class="callout-title"')
+      expect(html).toContain('Warning')
+      expect(html).toContain('This might break.')
+    })
+
+    it('renders :::tip callout with custom label', async () => {
+      const content = ':::tip[Pro tip]\nUse the shortcut.\n:::'
+      const { html } = await parseMarkdown(content, 'Test')
+      expect(html).toContain('class="callout callout-tip"')
+      expect(html).toContain('Pro tip')
+    })
+
+    it('renders all supported callout types', async () => {
+      for (const type of ['note', 'tip', 'warning', 'danger', 'caution', 'info']) {
+        const { html } = await parseMarkdown(`:::${type}\ncontent\n:::`, 'Test')
+        expect(html).toContain(`callout-${type}`)
+      }
+    })
+
+    it('ignores unknown directive types', async () => {
+      const { html } = await parseMarkdown(':::unknown\ncontent\n:::', 'Test')
+      expect(html).not.toContain('callout')
+    })
+  })
 })

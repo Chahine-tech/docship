@@ -56,6 +56,7 @@ export const projects = sqliteTable('projects', {
   repoName: text('repo_name').notNull(),
   docsFolder: text('docs_folder').notNull().default('docs'),
   webhookSecret: text('webhook_secret'),
+  readToken: text('read_token'),
   customDomain: text('custom_domain'),
   isPrivate: integer('is_private', { mode: 'boolean' }).notNull().default(false),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),

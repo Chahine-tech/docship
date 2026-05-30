@@ -3,7 +3,7 @@ import type { Context } from 'hono'
 import { getDb } from '../../db/client'
 import { projects, docVersions } from '../../db/schema'
 import { eq, and } from 'drizzle-orm'
-import { getPage, getNav, getLatestVersion } from '../../services/build/kv'
+import { getPage, getNav, getLatestVersion, getAgentContext } from '../../services/build/kv'
 import { createAuth } from '../../auth'
 import type { Env, NavItem } from '../../types'
 
@@ -14,6 +14,30 @@ async function isAuthenticated(c: Context<{ Bindings: Env }>): Promise<boolean> 
   const session = await auth.api.getSession({ headers: c.req.raw.headers })
   return session !== null
 }
+
+// GET /docs/:slug/llms.txt — agent-friendly context (latest version)
+docsRouter.get('/:slug/llms.txt', async (c) => {
+  const { slug } = c.req.param()
+
+  const project = await getDb(c.env.DB)
+    .select({ isPrivate: projects.isPrivate })
+    .from(projects)
+    .where(eq(projects.slug, slug))
+    .get()
+
+  if (!project) return c.notFound()
+  if (project.isPrivate && !(await isAuthenticated(c))) {
+    return c.text('Unauthorized', 401)
+  }
+
+  const latest = await getLatestVersion(c.env.DOCS_KV, slug)
+  if (!latest) return c.notFound()
+
+  const text = await getAgentContext(c.env.DOCS_KV, slug, latest)
+  if (!text) return c.notFound()
+
+  return c.text(text, 200, { 'Content-Type': 'text/plain; charset=utf-8' })
+})
 
 // GET /docs/:slug — resolve to latest version
 docsRouter.get('/:slug', async (c) => {
@@ -34,6 +58,27 @@ docsRouter.get('/:slug', async (c) => {
   if (!latest) return c.json({ error: 'no published version found' }, 404)
 
   return c.redirect(`/docs/${slug}/${latest}`, 302)
+})
+
+// GET /docs/:slug/:version/llms.txt — agent-friendly context (specific version)
+docsRouter.get('/:slug/:version/llms.txt', async (c) => {
+  const { slug, version } = c.req.param()
+
+  const project = await getDb(c.env.DB)
+    .select({ isPrivate: projects.isPrivate })
+    .from(projects)
+    .where(eq(projects.slug, slug))
+    .get()
+
+  if (!project) return c.notFound()
+  if (project.isPrivate && !(await isAuthenticated(c))) {
+    return c.text('Unauthorized', 401)
+  }
+
+  const text = await getAgentContext(c.env.DOCS_KV, slug, version)
+  if (!text) return c.notFound()
+
+  return c.text(text, 200, { 'Content-Type': 'text/plain; charset=utf-8' })
 })
 
 // GET /docs/:slug/:version — index: redirect to first page

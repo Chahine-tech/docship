@@ -192,7 +192,7 @@ export const Landing: FC = () => (
             },
             {
               name: 'Pro',
-              price: '€12',
+              price: '€6',
               period: 'per month',
               features: ['Unlimited projects', 'Private docs', 'Custom domain', 'Analytics', 'OpenAPI reference'],
               cta: 'Start free trial',
@@ -200,7 +200,7 @@ export const Landing: FC = () => (
             },
             {
               name: 'Team',
-              price: '€29',
+              price: '€12',
               period: 'per month',
               features: ['Everything in Pro', 'Team members', 'SSO', 'Priority support'],
               cta: 'Contact us',

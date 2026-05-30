@@ -16,6 +16,10 @@ export const AppShell: FC<Props> = ({ user, children }) => (
         <div class="flex items-center gap-4">
           <span class="text-sm text-muted-foreground">{user.name}</span>
           <div class="w-px h-4 bg-border" />
+          <a href="/billing" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            Billing
+          </a>
+          <div class="w-px h-4 bg-border" />
           <button
             type="button"
             onclick="fetch('/api/auth/sign-out',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(()=>location.href='/login')"

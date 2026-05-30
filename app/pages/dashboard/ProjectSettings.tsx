@@ -30,7 +30,7 @@ const ProjectSettings: FC<Props> = ({ user, project, errors = {}, success }) => 
       <p class="text-muted-foreground text-sm mt-1">{project.repoOwner}/{project.repoName}</p>
     </div>
 
-    <div class="max-w-lg">
+    <div class="grid lg:grid-cols-2 gap-6 items-start max-w-4xl">
       <form method="post" class="rounded-xl border border-border bg-card p-6 space-y-5">
         {success && (
           <div class="rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-sm px-4 py-3">
@@ -105,8 +105,8 @@ const ProjectSettings: FC<Props> = ({ user, project, errors = {}, success }) => 
         </div>
       </form>
 
-      {/* Read token — separate section, not inside the settings form */}
-      <div class="mt-6 rounded-xl border border-border bg-card p-6 space-y-4">
+      {/* Read token — right column */}
+      <div class="rounded-xl border border-border bg-card p-6 space-y-4">
         <div>
           <h2 class="text-sm font-semibold">Read token</h2>
           <p class="text-xs text-muted-foreground mt-0.5">

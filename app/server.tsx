@@ -6,10 +6,14 @@ import { renderToString } from 'hono/jsx/dom/server'
 import type { Context } from 'hono'
 import { createAuth } from './auth'
 import { getDb } from './db/client'
-import { projects, docVersions, pageViews, searchEvents } from './db/schema'
+import { projects, docVersions, pageViews, searchEvents, users } from './db/schema'
 import { eq, and, gt, count, desc, sql } from 'drizzle-orm'
+import type { Plan } from './types'
+import { PLAN_LIMITS } from './types'
 import { projectsRouter } from './routes/api/projects'
+import { billingRouter } from './routes/api/billing'
 import { webhooks } from './routes/webhooks/github'
+import { stripeWebhooks } from './routes/webhooks/stripe'
 import { GitHubClient } from './services/github/client'
 import { decryptToken } from './services/crypto'
 import { accounts } from './db/schema'
@@ -52,6 +56,7 @@ app.use('*', async (c, next) => {
 // Inertia middleware only on dashboard routes — not on API or docs
 app.use('/dashboard', inertia({ rootView }))
 app.use('/projects/*', inertia({ rootView }))
+app.use('/billing', inertia({ rootView }))
 
 async function getSession(c: Context<AppEnv>) {
   return createAuth(c.env).api.getSession({ headers: c.req.raw.headers })
@@ -60,7 +65,9 @@ async function getSession(c: Context<AppEnv>) {
 // ─── API ─────────────────────────────────────────────────────────────
 app.all('/api/auth/*', (c) => createAuth(c.env).handler(c.req.raw))
 app.route('/api/projects', projectsRouter)
+app.route('/api/billing', billingRouter)
 app.route('/webhooks/github', webhooks)
+app.route('/webhooks/stripe', stripeWebhooks)
 app.get('/healthz', (c) => c.json({ ok: true }))
 
 // ─── Public pages (plain SSR, no Inertia) ───────────────────────────
@@ -119,6 +126,33 @@ app.get('/dashboard', async (c) => {
   })
 })
 
+app.get('/billing', async (c) => {
+  const session = await getSession(c)
+  if (!session) return c.redirect('/login')
+
+  const db = getDb(c.env.DB)
+  const [user, projectCountRow] = await Promise.all([
+    db
+      .select({ plan: users.plan, stripeSubscriptionId: users.stripeSubscriptionId })
+      .from(users)
+      .where(eq(users.id, session.user.id))
+      .get(),
+    db
+      .select({ total: count(projects.id) })
+      .from(projects)
+      .where(eq(projects.userId, session.user.id))
+      .get(),
+  ])
+
+  return c.render('dashboard/Billing', {
+    user: { name: session.user.name, image: session.user.image },
+    currentPlan: (user?.plan ?? 'free') as Plan,
+    projectCount: projectCountRow?.total ?? 0,
+    hasSubscription: !!user?.stripeSubscriptionId,
+    success: c.req.query('success') === '1',
+  })
+})
+
 app.get('/projects/new', async (c) => {
   const session = await getSession(c)
   if (!session) return c.redirect('/login')
@@ -163,6 +197,27 @@ app.post('/projects/new', async (c) => {
   const session = await getSession(c)
   if (!session) return c.redirect('/login')
 
+  const db = getDb(c.env.DB)
+
+  // Enforce plan project limit
+  const userPlan = await db
+    .select({ plan: users.plan })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .get()
+  const plan = (userPlan?.plan ?? 'free') as Plan
+  const limit = PLAN_LIMITS[plan].projects
+  if (limit !== Infinity) {
+    const projectCount = await db
+      .select({ total: count(projects.id) })
+      .from(projects)
+      .where(eq(projects.userId, session.user.id))
+      .get()
+    if ((projectCount?.total ?? 0) >= limit) {
+      return c.redirect('/billing?limit=projects')
+    }
+  }
+
   const form = await c.req.formData()
   const raw = Object.fromEntries(form) as Record<string, string>
   const result = createProjectSchema.safeParse(raw)
@@ -179,7 +234,6 @@ app.post('/projects/new', async (c) => {
     })
   }
 
-  const db = getDb(c.env.DB)
   const existing = await db.select({ id: projects.id }).from(projects).where(eq(projects.slug, result.data.slug)).get()
   if (existing) {
     return c.render('dashboard/NewProject', {

@@ -1,3 +1,11 @@
+export type Plan = 'free' | 'pro' | 'team'
+
+export const PLAN_LIMITS: Record<Plan, { projects: number }> = {
+  free: { projects: 1 },
+  pro:  { projects: Infinity },
+  team: { projects: Infinity },
+}
+
 export interface Env {
   DB: D1Database
   DOCS_KV: KVNamespace
@@ -7,6 +15,10 @@ export interface Env {
   BETTER_AUTH_SECRET: string
   TOKEN_ENCRYPTION_KEY: string
   APP_URL: string
+  STRIPE_SECRET_KEY: string
+  STRIPE_WEBHOOK_SECRET: string
+  STRIPE_PRO_PRICE_ID: string
+  STRIPE_TEAM_PRICE_ID: string
 }
 
 export interface BuildJob {

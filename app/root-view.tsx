@@ -14,5 +14,5 @@ const Head = () => (
 export const rootView: RootView = async (page) => {
   const { head, body } = await renderPage(page)
   const headHtml = renderToString(<Head />) + head.join('')
-  return `<!DOCTYPE html><html><head>${headHtml}</head><body>${body}</body></html>`
+  return `<!DOCTYPE html><html lang="en"><head><meta name="color-scheme" content="dark">${headHtml}</head><body>${body}</body></html>`
 }

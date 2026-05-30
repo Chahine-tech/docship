@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseMarkdown } from './parser'
+import { parseMarkdown, preprocessMdx } from './parser'
 
 describe('parseMarkdown', () => {
   it('converts basic markdown to HTML', async () => {
@@ -71,6 +71,56 @@ describe('parseMarkdown', () => {
     it('ignores unknown directive types', async () => {
       const { html } = await parseMarkdown(':::unknown\ncontent\n:::', 'Test')
       expect(html).not.toContain('callout')
+    })
+  })
+
+  describe('MDX preprocessing', () => {
+    it('strips ESM imports and exports', () => {
+      const mdx = `import Foo from './foo'\nexport const bar = 1\n\n# Title`
+      expect(preprocessMdx(mdx)).not.toContain('import')
+      expect(preprocessMdx(mdx)).not.toContain('export')
+      expect(preprocessMdx(mdx)).toContain('# Title')
+    })
+
+    it('converts <Callout type="warning"> to callout directive', () => {
+      const mdx = `<Callout type="warning">Be careful</Callout>`
+      expect(preprocessMdx(mdx)).toContain(':::warning')
+      expect(preprocessMdx(mdx)).toContain('Be careful')
+    })
+
+    it('converts <Callout> with title attribute', () => {
+      const mdx = `<Callout type="tip" title="Pro tip">Use shortcuts</Callout>`
+      const result = preprocessMdx(mdx)
+      expect(result).toContain(':::tip[Pro tip]')
+      expect(result).toContain('Use shortcuts')
+    })
+
+    it('converts shorthand <Warning>, <Tip>, <Note> tags', () => {
+      expect(preprocessMdx('<Warning>Oops</Warning>')).toContain(':::warning')
+      expect(preprocessMdx('<Tip>Nice</Tip>')).toContain(':::tip')
+      expect(preprocessMdx('<Note>FYI</Note>')).toContain(':::note')
+    })
+
+    it('unwraps <CodeGroup> keeping code blocks', () => {
+      const mdx = '<CodeGroup>\n```js\nconst x = 1\n```\n</CodeGroup>'
+      const result = preprocessMdx(mdx)
+      expect(result).not.toContain('<CodeGroup>')
+      expect(result).toContain('```js')
+    })
+
+    it('strips self-closing unknown JSX components', () => {
+      const mdx = 'Hello <MyComponent prop="x" /> world'
+      expect(preprocessMdx(mdx)).not.toContain('<MyComponent')
+    })
+
+    it('parses .mdx file end-to-end via parseMarkdown(isMdx=true)', async () => {
+      const mdx = `import Foo from './foo'\n\n# Guide\n\n<Warning>Read this first.</Warning>\n\nRegular paragraph.`
+      const { html } = await parseMarkdown(mdx, 'Guide', undefined, true)
+      expect(html).toContain('<h1')
+      expect(html).toContain('callout-warning')
+      expect(html).toContain('Read this first.')
+      expect(html).toContain('Regular paragraph.')
+      expect(html).not.toContain('import')
     })
   })
 })

@@ -59,14 +59,63 @@ const processor = unified()
   .use(rehypeHighlight, { detect: true })
   .use(rehypeStringify)
 
+// Preprocess .mdx files: converts known JSX components to markdown/directive
+// equivalents and strips imports/exports/unknown JSX before unified parsing.
+export function preprocessMdx(content: string): string {
+  let s = content
+
+  // Strip ESM imports and exports (top-level only)
+  s = s.replace(/^import\s[^\n]+\n?/gm, '')
+  s = s.replace(/^export\s(?!default)[^\n]+\n?/gm, '')
+  s = s.replace(/^export\s+default\s[^\n]+\n?/gm, '')
+
+  // <Callout type="warning" title="…">body</Callout>
+  s = s.replace(
+    /<Callout\s+type=["'](\w+)["'](?:[^>]*title=["']([^"']+)["'])?[^>]*>([\s\S]*?)<\/Callout>/gi,
+    (_, type, title, body) =>
+      title ? `:::${type}[${title}]\n${body.trim()}\n:::` : `:::${type}\n${body.trim()}\n:::`
+  )
+
+  // Shorthand callout tags: <Note>, <Warning>, <Tip>, <Danger>, <Info>, <Caution>
+  const shorthands: [string, string][] = [
+    ['Note', 'note'], ['Warning', 'warning'], ['Tip', 'tip'],
+    ['Danger', 'danger'], ['Info', 'info'], ['Caution', 'caution'],
+  ]
+  for (const [Tag, directive] of shorthands) {
+    s = s.replace(
+      new RegExp(`<${Tag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${Tag}>`, 'gi'),
+      (_, body) => `:::${directive}\n${body.trim()}\n:::`
+    )
+  }
+
+  // <Steps> — wrap content in an ordered-list div with callout-like styling
+  s = s.replace(
+    /<Steps(?:\s[^>]*)?>([\s\S]*?)<\/Steps>/gi,
+    (_, body) => `<div class="steps">\n\n${body.trim()}\n\n</div>`
+  )
+
+  // <CodeGroup> — unwrap, keep inner code blocks (they render fine as-is)
+  s = s.replace(/<CodeGroup(?:\s[^>]*)?>([\s\S]*?)<\/CodeGroup>/gi, (_, body) => body.trim())
+
+  // Self-closing unknown JSX: <Component /> → nothing
+  s = s.replace(/<[A-Z][A-Za-z0-9]*(?:\s[^>]*)?\s*\/>/g, '')
+
+  // Unknown block JSX: <Component …>content</Component> → preserve inner content
+  s = s.replace(/<([A-Z][A-Za-z0-9]*)(?:\s[^>]*)?>([\s\S]*?)<\/\1>/g, (_, _tag, body) => body.trim())
+
+  return s
+}
+
 export async function parseMarkdown(
   content: string,
   title: string,
-  ctx?: BuildContext
+  ctx?: BuildContext,
+  isMdx = false
 ): Promise<PageContent> {
-  const body = content.replace(/^---[\s\S]*?---\r?\n/, '')
+  const stripped = content.replace(/^---[\s\S]*?---\r?\n/, '')
+  const body = isMdx ? preprocessMdx(stripped) : stripped
 
-  const vfile = await processor.process(body)
+  const vfile = await processor.process(body)  // body already stripped/preprocessed above
   let html = String(vfile)
 
   if (ctx) {

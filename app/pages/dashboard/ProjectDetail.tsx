@@ -50,6 +50,12 @@ const ProjectDetail: FC<Props> = ({ user, project, versions }) => (
             </a>
           )}
           <a
+            href={`/projects/${project.id}/analytics`}
+            class="inline-flex items-center gap-2 h-9 px-4 rounded-md border border-border bg-card text-sm hover:bg-accent transition-colors"
+          >
+            Analytics
+          </a>
+          <a
             href={`/projects/${project.id}/settings`}
             class="inline-flex items-center gap-2 h-9 px-4 rounded-md border border-border bg-card text-sm hover:bg-accent transition-colors"
           >

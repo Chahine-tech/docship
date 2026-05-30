@@ -1,4 +1,4 @@
-import type { NavItem } from '../../types'
+import type { NavItem, DocshipConfig } from '../../types'
 
 interface FileEntry {
   path: string       // relative to docsFolder, e.g. "api/authentication.md"
@@ -6,7 +6,69 @@ interface FileEntry {
   order: number
 }
 
-export function buildNavTree(files: FileEntry[]): NavItem[] {
+export function buildNavTree(files: FileEntry[], config?: DocshipConfig): NavItem[] {
+  // Apply exclusions
+  const excluded = config?.exclude ?? []
+  const filtered = excluded.length
+    ? files.filter((f) => {
+        const urlPath = f.path.replace(/\.md$/i, '').replace(/(\/index|\/readme)$/i, '') || '/'
+        return !excluded.some((ex) => urlPath === ex || urlPath.startsWith(ex + '/'))
+      })
+    : files
+
+  // If a sidebar config is provided, build nav in the declared order
+  if (config?.sidebar?.length) {
+    return buildNavFromConfig(filtered, config.sidebar)
+  }
+
+  return buildNavAuto(filtered)
+}
+
+function buildNavFromConfig(
+  files: FileEntry[],
+  sections: NonNullable<DocshipConfig['sidebar']>
+): NavItem[] {
+  // Build a lookup: urlPath → NavItem leaf
+  const byPath = new Map<string, NavItem>()
+  for (const file of files) {
+    const parts = file.path.replace(/\.md$/i, '').split('/')
+    const lastPart = parts[parts.length - 1].toLowerCase()
+    const isIndex = lastPart === 'index' || lastPart === 'readme'
+    const urlParts = isIndex ? parts.slice(0, -1) : parts
+    const urlPath = urlParts.length > 0 ? urlParts.join('/') : ''
+    byPath.set(urlPath, { title: file.title, path: '/' + (urlPath || ''), order: file.order })
+  }
+
+  const seen = new Set<string>()
+  const result: NavItem[] = []
+
+  for (const section of sections) {
+    const children: NavItem[] = []
+    for (const pagePath of section.pages) {
+      const node = byPath.get(pagePath)
+      if (node) {
+        children.push(node)
+        seen.add(pagePath)
+      }
+    }
+    if (children.length === 0) continue
+    // Single page section with same title → inline it, no wrapper
+    if (children.length === 1 && children[0].title === section.title) {
+      result.push({ ...children[0], order: result.length })
+    } else {
+      result.push({ title: section.title, children, order: result.length })
+    }
+  }
+
+  // Append remaining pages not covered by config
+  for (const [urlPath, node] of byPath) {
+    if (!seen.has(urlPath)) result.push({ ...node, order: result.length })
+  }
+
+  return result
+}
+
+function buildNavAuto(files: FileEntry[]): NavItem[] {
   const root: Map<string, NavItem> = new Map()
 
   // Sort: directories first, then by order, then alphabetically
@@ -68,7 +130,7 @@ export function buildNavTree(files: FileEntry[]): NavItem[] {
   const result = Array.from(root.values())
   sortNavItems(result)
   return result
-}
+} // end buildNavAuto
 
 function sortNavItems(items: NavItem[]): void {
   items.sort((a, b) => {

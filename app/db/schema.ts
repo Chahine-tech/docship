@@ -73,6 +73,22 @@ export const docVersions = sqliteTable('doc_versions', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
+export const pageViews = sqliteTable('page_views', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  version: text('version').notNull(),
+  path: text('path').notNull(),
+  viewedAt: integer('viewed_at', { mode: 'timestamp' }).notNull(),
+})
+
+export const searchEvents = sqliteTable('search_events', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  query: text('query').notNull(),
+  resultsCount: integer('results_count').notNull().default(0),
+  searchedAt: integer('searched_at', { mode: 'timestamp' }).notNull(),
+})
+
 export const docPages = sqliteTable('doc_pages', {
   id: text('id').primaryKey(),
   versionId: text('version_id').notNull().references(() => docVersions.id, { onDelete: 'cascade' }),

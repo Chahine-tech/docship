@@ -1,16 +1,24 @@
 import type { FC } from 'hono/jsx'
 import { Link, ViteClient } from 'vite-ssr-components/hono'
+import { Icon } from '../ui/icon'
+import type { LucideIcon } from '../ui/icon'
+import {
+  Zap, FileText, Search, Bot, Lock, FileCode,
+  Globe, ChartBar, ListTree,
+} from 'lucide'
 
 export const Landing: FC = () => (
   <html lang="en">
     <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <meta name="color-scheme" content="dark" />
       <title>Docship — Docs as Code, versioned automatically</title>
       <ViteClient />
       <Link rel="stylesheet" href="/app/styles.css" />
     </head>
     <body class="bg-background text-foreground">
+
       {/* Nav */}
       <header class="h-14 border-b border-border flex items-center px-6 max-w-6xl mx-auto gap-6">
         <span class="text-sm font-semibold tracking-tight">docship</span>
@@ -35,15 +43,15 @@ export const Landing: FC = () => (
         </h1>
         <p class="text-lg text-muted-foreground max-w-xl mx-auto mb-10">
           No Docusaurus. No CI pipeline. No separate repo.<br />
-          Docship reads your <code class="text-foreground bg-muted rounded px-1.5 py-0.5 text-sm">.md</code> files from GitHub and publishes a new version every time you push a tag.
+          Docship reads your <code class="text-foreground bg-muted rounded px-1.5 py-0.5 text-sm">.md</code> and <code class="text-foreground bg-muted rounded px-1.5 py-0.5 text-sm">.mdx</code> files from GitHub and publishes a versioned docs site every time you push a tag.
         </p>
         <div class="flex items-center justify-center gap-4">
           <a href="/login/github" class="inline-flex items-center gap-2 h-10 px-6 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors">
             <GithubIcon />
             Continue with GitHub
           </a>
-          <a href="#how" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            See how it works →
+          <a href="#features" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            See all features →
           </a>
         </div>
       </section>
@@ -66,6 +74,35 @@ export const Landing: FC = () => (
             <p class="text-muted-foreground"> * [new tag]   v2.0.0 → v2.0.0</p>
             <p class="mt-3"><span class="text-emerald-400">✓</span> <span class="text-muted-foreground">docship.app/your-project/v2.0.0 is live</span></p>
           </div>
+        </div>
+      </section>
+
+      {/* Features grid */}
+      <section id="features" class="max-w-5xl mx-auto px-6 pb-24">
+        <h2 class="text-2xl font-bold text-center mb-3">Everything you need. Nothing you don't.</h2>
+        <p class="text-center text-muted-foreground mb-12 text-sm">Built for developers who want great docs without the maintenance overhead.</p>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {(
+            [
+              [Zap,      'Zero config versioning',   'Push a git tag. Docship picks it up via webhook and publishes a new version instantly. No CI, no YAML files.'],
+              [FileText, 'MDX + Callouts',            'Write .md or .mdx files. Use <Warning>, <Tip>, <Steps> and :::callout directives out of the box.'],
+              [Search,   'Full-text search',          'Built-in search with instant results and keyword highlighting. No Algolia account required.'],
+              [Bot,      'Agent-friendly /llms.txt',  'Every doc site exposes /llms.txt — context optimised for AI agents. One URL instead of 50 pages.'],
+              [Lock,     'Private docs',              'Make docs private with a single toggle. Share access via read token — no GitHub login required for readers.'],
+              [FileCode, 'OpenAPI reference',         'Drop an openapi.yaml in your repo root. Docship auto-generates a full API reference page on every build.'],
+              [Globe,    'Custom domain',             'Point a CNAME to docship.app and set it in your project settings. Your docs live at docs.your-app.com.'],
+              [ChartBar, 'Analytics',                 'See which pages get the most traffic and what your users are searching for. No third-party scripts.'],
+              [ListTree, 'Configurable sidebar',      'Drop a docship.config.json in your repo to control section order, titles, and excluded pages.'],
+            ] as [LucideIcon, string, string][]
+          ).map(([icon, title, desc]) => (
+            <div class="rounded-xl border border-border bg-card p-5">
+              <div class="h-8 w-8 rounded-md bg-muted flex items-center justify-center mb-3 text-muted-foreground">
+                <Icon icon={icon} size={16} />
+              </div>
+              <h3 class="font-semibold mb-1.5 text-sm">{title}</h3>
+              <p class="text-sm text-muted-foreground leading-relaxed">{desc}</p>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -101,7 +138,7 @@ export const Landing: FC = () => (
       </section>
 
       {/* vs table */}
-      <section class="max-w-3xl mx-auto px-6 pb-24">
+      <section class="max-w-4xl mx-auto px-6 pb-24">
         <h2 class="text-2xl font-bold text-center mb-12">Why not Docusaurus / GitBook?</h2>
         <div class="rounded-xl border border-border overflow-hidden">
           <table class="w-full text-sm">
@@ -120,6 +157,11 @@ export const Landing: FC = () => (
                 ['Docs live in your repo', '✓', '✓', '✗'],
                 ['No CI pipeline needed', '✓', '✗', '✓'],
                 ['Edge-hosted, fast everywhere', '✓', '✗', '✗'],
+                ['Full-text search built-in', '✓', '~', '✓'],
+                ['Private docs with token sharing', '✓', '✗', '✓'],
+                ['Custom domain', '✓', '✓', '✓'],
+                ['OpenAPI reference page', '✓', '~', '✗'],
+                ['Agent-friendly /llms.txt', '✓', '✗', '✗'],
                 ['Free to start', '✓', '✓', '~'],
               ].map(([feature, d, doc, gb]) => (
                 <tr>
@@ -134,6 +176,67 @@ export const Landing: FC = () => (
         </div>
       </section>
 
+      {/* Pricing */}
+      <section class="max-w-4xl mx-auto px-6 pb-24">
+        <h2 class="text-2xl font-bold text-center mb-3">Simple pricing</h2>
+        <p class="text-center text-muted-foreground mb-12 text-sm">Start free. Upgrade when you need more.</p>
+        <div class="grid sm:grid-cols-3 gap-4">
+          {[
+            {
+              name: 'Free',
+              price: '€0',
+              period: 'forever',
+              features: ['1 project', 'Public docs', 'docship.app subdomain', 'Full-text search', 'llms.txt'],
+              cta: 'Get started',
+              highlight: false,
+            },
+            {
+              name: 'Pro',
+              price: '€12',
+              period: 'per month',
+              features: ['Unlimited projects', 'Private docs', 'Custom domain', 'Analytics', 'OpenAPI reference'],
+              cta: 'Start free trial',
+              highlight: true,
+            },
+            {
+              name: 'Team',
+              price: '€29',
+              period: 'per month',
+              features: ['Everything in Pro', 'Team members', 'SSO', 'Priority support'],
+              cta: 'Contact us',
+              highlight: false,
+            },
+          ].map((plan) => (
+            <div class={`rounded-xl border p-6 flex flex-col ${plan.highlight ? 'border-primary/40 bg-primary/5' : 'border-border bg-card'}`}>
+              <div class="mb-4">
+                <p class="text-sm font-medium text-muted-foreground mb-1">{plan.name}</p>
+                <div class="flex items-baseline gap-1">
+                  <span class="text-3xl font-bold">{plan.price}</span>
+                  <span class="text-sm text-muted-foreground">/{plan.period}</span>
+                </div>
+              </div>
+              <ul class="space-y-2 mb-6 flex-1">
+                {plan.features.map((f) => (
+                  <li class="text-sm text-muted-foreground flex items-center gap-2">
+                    <span class="text-emerald-400 shrink-0">✓</span> {f}
+                  </li>
+                ))}
+              </ul>
+              <a
+                href="/login/github"
+                class={`inline-flex items-center justify-center h-9 rounded-md text-sm font-medium transition-colors ${
+                  plan.highlight
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    : 'border border-border hover:bg-accent'
+                }`}
+              >
+                {plan.cta}
+              </a>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* CTA */}
       <section class="border-t border-border">
         <div class="max-w-2xl mx-auto px-6 py-24 text-center">
@@ -145,6 +248,7 @@ export const Landing: FC = () => (
           </a>
         </div>
       </section>
+
     </body>
   </html>
 )

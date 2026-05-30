@@ -4,11 +4,12 @@ import { buildNavTree, extractFileMetadata } from './navigation'
 import { storePage, storeNav, storeLatestVersion, storeAgentContext } from './kv'
 import { buildLlmsTxt } from './llms'
 import type { LlmsFileEntry } from './llms'
+import { parseOpenApiContent, renderOpenApiHtml } from './openapi'
 import { decryptToken } from '../crypto'
 import { getDb } from '../../db/client'
 import { docVersions, docPages, projects, accounts } from '../../db/schema'
 import { eq, and } from 'drizzle-orm'
-import type { BuildJob, Env } from '../../types'
+import type { BuildJob, Env, DocshipConfig } from '../../types'
 
 export async function runBuildPipeline(job: BuildJob, env: Env): Promise<void> {
   const db = getDb(env.DB)
@@ -48,7 +49,7 @@ export async function runBuildPipeline(job: BuildJob, env: Env): Promise<void> {
     // 3. Filter to markdown files inside the docs folder
     const docsPrefix = job.docsFolder.replace(/\/$/, '') + '/'
     const mdFiles = tree.tree.filter(
-      (f) => f.type === 'blob' && f.path.startsWith(docsPrefix) && f.path.endsWith('.md')
+      (f) => f.type === 'blob' && f.path.startsWith(docsPrefix) && /\.(md|mdx)$/i.test(f.path)
     )
 
     // Also look for root README.md as a fallback homepage
@@ -108,6 +109,7 @@ export async function runBuildPipeline(job: BuildJob, env: Env): Promise<void> {
       const urlParts = isIndexFile ? parts.slice(0, -1) : parts
       const urlPath = urlParts.length > 0 ? '/' + urlParts.join('/') : '/'
 
+      const isMdx = file.path.endsWith('.mdx')
       const { title, order } = extractFileMetadata(content, relativePath)
       const parsed = await parseMarkdown(content, title, {
         owner: job.repoOwner,
@@ -117,7 +119,7 @@ export async function runBuildPipeline(job: BuildJob, env: Env): Promise<void> {
         docsFolder: job.docsFolder,
         slug,
         version: job.tag,
-      })
+      }, isMdx)
 
       const kvKey = `page:${slug}:${job.tag}:${urlPath}`
       await storePage(env.DOCS_KV, slug, job.tag, urlPath, parsed)
@@ -137,13 +139,55 @@ export async function runBuildPipeline(job: BuildJob, env: Env): Promise<void> {
       })
     }
 
+    // 6.5. Check for OpenAPI/Swagger spec at repo root and generate reference page
+    const openApiFilePre = tree.tree.find(
+      (f) =>
+        f.type === 'blob' &&
+        /^(openapi|swagger)\.(json|ya?ml)$/i.test(f.path)
+    )
+    if (openApiFilePre) {
+      try {
+        const specContent = await github.getBlobContent(job.repoOwner, job.repoName, openApiFilePre.sha)
+        const spec = parseOpenApiContent(specContent, openApiFilePre.path)
+        if (spec) {
+          const apiHtml = renderOpenApiHtml(spec)
+          const apiTitle = spec.info?.title ?? 'API Reference'
+          const apiPage = { html: apiHtml, title: apiTitle, headings: [] }
+          await storePage(env.DOCS_KV, slug, job.tag, '/api-reference', apiPage)
+          fileEntries.push({ path: 'api-reference.md', title: apiTitle, order: 9999 })
+          pageInserts.push({
+            id: crypto.randomUUID(),
+            versionId: job.versionId,
+            path: '/api-reference',
+            title: apiTitle,
+            kvKey: `page:${slug}:${job.tag}:/api-reference`,
+            orderIndex: 9999,
+          })
+          ftsRows.push({ path: '/api-reference', title: apiTitle, body: htmlToPlainText(apiHtml) })
+          llmsFileEntries.push({ relativePath: 'api-reference.md', title: apiTitle, urlPath: '/api-reference' })
+          rawDocsMap.set('api-reference.md', `# ${apiTitle}\n\n${htmlToPlainText(apiHtml).slice(0, 2000)}`)
+        }
+      } catch { /* malformed spec — skip */ }
+    }
+
     // Batch insert all pages into D1
     if (pageInserts.length > 0) {
       await db.insert(docPages).values(pageInserts)
     }
 
-    // 7. Build and store navigation tree
-    const navTree = buildNavTree(fileEntries)
+    // 7. Fetch optional docship.config.json and build navigation tree
+    let docshipConfig: DocshipConfig | undefined
+    const configFile = tree.tree.find(
+      (f) => f.type === 'blob' && /^docship\.config\.json$/i.test(f.path)
+    )
+    if (configFile) {
+      try {
+        const raw = await github.getBlobContent(job.repoOwner, job.repoName, configFile.sha)
+        docshipConfig = JSON.parse(raw) as DocshipConfig
+      } catch { /* malformed config — fall back to auto */ }
+    }
+
+    const navTree = buildNavTree(fileEntries, docshipConfig)
     await storeNav(env.DOCS_KV, slug, job.tag, navTree)
 
     // 8. Index pages into FTS (clear first for idempotent rebuilds)
@@ -160,7 +204,7 @@ export async function runBuildPipeline(job: BuildJob, env: Env): Promise<void> {
       )
     }
 
-    // 9. Build and store agent context (llms.txt)
+    // 10. Build and store agent context (llms.txt)
     const agentFilesToFetch = tree.tree.filter(
       (f) =>
         f.type === 'blob' &&

@@ -55,9 +55,20 @@ export interface GitHubPushPayload {
   }
 }
 
+export interface DocshipSidebarSection {
+  title: string
+  pages: string[]  // URL paths without leading slash, e.g. "api/authentication"
+}
+
+export interface DocshipConfig {
+  sidebar?: DocshipSidebarSection[]
+  exclude?: string[]  // glob-like path prefixes to hide from nav
+}
+
 export interface AppVariables {
   userId: string
   sessionId: string
+  customDomainSlug?: string
 }
 
 export type AppEnv = {

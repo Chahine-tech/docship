@@ -9,6 +9,7 @@ interface Project {
   repoName: string
   docsFolder: string
   isPrivate: boolean
+  customDomain?: string | null
   readToken?: string | null
 }
 
@@ -61,6 +62,22 @@ const ProjectSettings: FC<Props> = ({ user, project, errors = {}, success }) => 
           />
           <p class="text-xs text-muted-foreground">Folder in your repo containing the .md files.</p>
           {errors.docsFolder && <p class="text-xs text-destructive">{errors.docsFolder}</p>}
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="text-sm font-medium" for="customDomain">Custom domain</label>
+          <input
+            id="customDomain"
+            name="customDomain"
+            type="text"
+            value={project.customDomain ?? ''}
+            placeholder="docs.your-app.com"
+            class={`w-full h-9 rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring ${errors.customDomain ? 'border-destructive' : 'border-border'}`}
+          />
+          <p class="text-xs text-muted-foreground">
+            Point a CNAME record at <code class="font-mono">docship.app</code>, then enter the domain here.
+          </p>
+          {errors.customDomain && <p class="text-xs text-destructive">{errors.customDomain}</p>}
         </div>
 
         <div class="flex items-center gap-3">

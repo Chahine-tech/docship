@@ -29,7 +29,7 @@
 @layer base {
   * { @apply border-border box-border; }
 
-  html { @apply bg-background text-foreground antialiased; }
+  html { @apply bg-background text-foreground antialiased; color-scheme: dark; }
 
   body { @apply font-sans min-h-screen text-base; }
 
@@ -69,6 +69,44 @@
 
     ul:has(input[type='checkbox']) { @apply list-none pl-0; }
     input[type='checkbox'] { @apply mr-2; }
+
+    /* MDX <Steps> component */
+    .steps {
+      @apply space-y-4 pl-0;
+      counter-reset: steps;
+
+      ol { @apply list-none pl-0 space-y-4; }
+      li {
+        @apply relative pl-10;
+        counter-increment: steps;
+        &::before {
+          content: counter(steps);
+          @apply absolute left-0 top-0.5 h-6 w-6 rounded-full bg-primary/15 border border-primary/30
+                 text-primary text-xs font-bold flex items-center justify-center;
+        }
+      }
+    }
+
+    /* OpenAPI reference page */
+    .api-endpoint {
+      @apply rounded-lg border border-border bg-card/50 p-4 mb-4;
+    }
+    .api-deprecated { @apply opacity-60; }
+    .api-method-line { @apply flex items-center gap-2 mb-2 flex-wrap; }
+    .api-method {
+      @apply text-xs font-bold font-mono px-2 py-0.5 rounded border uppercase;
+    }
+    .api-path { @apply text-sm font-mono; }
+    .api-summary { @apply text-sm font-medium mb-1; }
+    .api-desc { @apply text-sm text-muted-foreground mb-2; }
+    .api-badge-deprecated {
+      @apply text-xs bg-destructive/10 text-destructive border border-destructive/20 rounded px-1.5 py-0.5;
+    }
+    .api-table {
+      @apply w-full text-xs mb-3;
+      th { @apply text-left px-2 py-1.5 border-b border-border font-medium text-muted-foreground; }
+      td { @apply px-2 py-1.5 border-b border-border; }
+    }
 
     /* Callouts / admonitions */
     .callout {

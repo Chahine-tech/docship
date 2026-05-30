@@ -6,8 +6,8 @@ import { renderToString } from 'hono/jsx/dom/server'
 import type { Context } from 'hono'
 import { createAuth } from './auth'
 import { getDb } from './db/client'
-import { projects, docVersions } from './db/schema'
-import { eq, and } from 'drizzle-orm'
+import { projects, docVersions, pageViews, searchEvents } from './db/schema'
+import { eq, and, gt, count, desc, sql } from 'drizzle-orm'
 import { projectsRouter } from './routes/api/projects'
 import { webhooks } from './routes/webhooks/github'
 import { GitHubClient } from './services/github/client'
@@ -22,6 +22,32 @@ import { DocsLayout } from './pages/layouts/DocsLayout'
 import type { AppEnv, NavItem } from './types'
 
 const app = new Hono<AppEnv>()
+
+// Custom domain middleware — rewrite requests from custom domains to /docs/{slug}/...
+app.use('*', async (c, next) => {
+  const host = (c.req.header('host') ?? '').split(':')[0]
+  const appHostname = (() => { try { return new URL(c.env.APP_URL).hostname } catch { return '' } })()
+
+  if (host && host !== appHostname && !host.match(/^(localhost|127\.)/)) {
+    const project = await getDb(c.env.DB)
+      .select({ slug: projects.slug })
+      .from(projects)
+      .where(eq(projects.customDomain, host))
+      .get()
+
+    if (project) {
+      const reqPath = c.req.path
+      // / → /docs/{slug} (will redirect to latest)
+      // /v1.0.0/... → /docs/{slug}/v1.0.0/...
+      const rewritten = reqPath === '/' ? `/docs/${project.slug}` : `/docs/${project.slug}${reqPath}`
+      const newUrl = new URL(c.req.url)
+      newUrl.pathname = rewritten
+      return app.fetch(new Request(newUrl.toString(), c.req.raw), c.env, c.executionCtx)
+    }
+  }
+
+  return next()
+})
 
 // Inertia middleware only on dashboard routes — not on API or docs
 app.use('/dashboard', inertia({ rootView }))
@@ -198,6 +224,7 @@ const settingsSchema = z.object({
   name: z.string().min(1).max(100),
   docsFolder: z.string().min(1),
   isPrivate: z.string().optional(),
+  customDomain: z.string().optional(),
 })
 
 app.get('/projects/:id/settings', async (c) => {
@@ -249,6 +276,7 @@ app.post('/projects/:id/settings', async (c) => {
     name: result.data.name,
     docsFolder: result.data.docsFolder,
     isPrivate: result.data.isPrivate === 'true',
+    customDomain: result.data.customDomain?.trim() || null,
   }
 
   await db.update(projects).set(updated).where(eq(projects.id, project.id))
@@ -257,6 +285,67 @@ app.post('/projects/:id/settings', async (c) => {
     user: { name: session.user.name, image: session.user.image },
     project: { ...project, ...updated },
     success: true,
+  })
+})
+
+app.get('/projects/:id/analytics', async (c) => {
+  const session = await getSession(c)
+  if (!session) return c.redirect('/login')
+
+  const db = getDb(c.env.DB)
+  const project = await db
+    .select({ id: projects.id, slug: projects.slug, name: projects.name })
+    .from(projects)
+    .where(and(eq(projects.id, c.req.param('id')), eq(projects.userId, session.user.id)))
+    .get()
+
+  if (!project) return c.notFound()
+
+  const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
+  const [totalViewsRow, topPages, topSearches, dailyViews] = await Promise.all([
+    db
+      .select({ total: count(pageViews.id) })
+      .from(pageViews)
+      .where(and(eq(pageViews.projectId, project.id), gt(pageViews.viewedAt, since30d)))
+      .get(),
+
+    db
+      .select({ path: pageViews.path, views: count(pageViews.id) })
+      .from(pageViews)
+      .where(and(eq(pageViews.projectId, project.id), gt(pageViews.viewedAt, since30d)))
+      .groupBy(pageViews.path)
+      .orderBy(desc(count(pageViews.id)))
+      .limit(10)
+      .all(),
+
+    db
+      .select({ query: searchEvents.query, total: count(searchEvents.id) })
+      .from(searchEvents)
+      .where(eq(searchEvents.projectId, project.id))
+      .groupBy(searchEvents.query)
+      .orderBy(desc(count(searchEvents.id)))
+      .limit(10)
+      .all(),
+
+    db.all(
+      sql`SELECT date(viewed_at, 'unixepoch') as day, count(*) as views
+          FROM page_views
+          WHERE project_id = ${project.id}
+            AND viewed_at > unixepoch() - 14 * 86400
+          GROUP BY day ORDER BY day`
+    ) as Promise<{ day: string; views: number }[]>,
+  ])
+
+  return c.render('dashboard/Analytics', {
+    user: { name: session.user.name, image: session.user.image },
+    project,
+    stats: {
+      totalViews: totalViewsRow?.total ?? 0,
+      topPages,
+      topSearches,
+      dailyViews,
+    },
   })
 })
 
@@ -295,7 +384,7 @@ app.get('/docs/:slug/search', async (c) => {
 
   const db = getDb(c.env.DB)
   const project = await db
-    .select({ isPrivate: projects.isPrivate, readToken: projects.readToken })
+    .select({ id: projects.id, isPrivate: projects.isPrivate, readToken: projects.readToken })
     .from(projects)
     .where(eq(projects.slug, slug))
     .get()
@@ -321,6 +410,16 @@ app.get('/docs/:slug/search', async (c) => {
       )
       .bind(ftsQuery, slug, searchVersion)
       .all<{ path: string; title: string; snippet: string }>()
+
+    c.executionCtx.waitUntil(
+      getDb(c.env.DB).insert(searchEvents).values({
+        id: crypto.randomUUID(),
+        projectId: project.id,
+        query: q,
+        resultsCount: results.length,
+        searchedAt: new Date(),
+      }).catch(() => {})
+    )
 
     return c.json({ results })
   } catch {
@@ -387,6 +486,18 @@ app.get('/docs/:slug/:version/*', async (c) => {
       <div dangerouslySetInnerHTML={{ __html: page.html }} />
     </DocsLayout>
   )
+
+  if (project) {
+    c.executionCtx.waitUntil(
+      getDb(c.env.DB).insert(pageViews).values({
+        id: crypto.randomUUID(),
+        projectId: project.id,
+        version,
+        path,
+        viewedAt: new Date(),
+      }).catch(() => {})
+    )
+  }
 
   return new Response('<!DOCTYPE html>' + html, {
     headers: { 'Content-Type': 'text/html; charset=utf-8' },

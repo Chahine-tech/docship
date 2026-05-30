@@ -44,12 +44,19 @@ const Analytics: FC<Props> = ({ user, project, stats }) => {
           <h2 class="text-sm font-semibold mb-4">Views — last 14 days</h2>
           <div class="flex items-end gap-1 h-16">
             {stats.dailyViews.map((d) => (
-              <div
-                key={d.day}
-                class="flex-1 bg-primary/30 hover:bg-primary/50 rounded-sm transition-colors cursor-default"
-                style={`height: ${Math.max(4, Math.round((d.views / maxDailyViews) * 64))}px`}
-                title={`${d.day}: ${d.views} views`}
-              />
+              <div key={d.day} class="relative flex-1 group flex items-end h-full">
+                <div
+                  class="w-full bg-primary/30 group-hover:bg-primary/60 rounded-sm transition-colors cursor-default"
+                  style={`height: ${Math.max(4, Math.round((d.views / maxDailyViews) * 64))}px`}
+                />
+                <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block pointer-events-none z-10">
+                  <div class="bg-card border border-border rounded-md px-2.5 py-1.5 text-xs shadow-lg whitespace-nowrap text-center">
+                    <div class="font-semibold tabular-nums">{d.views} views</div>
+                    <div class="text-muted-foreground text-[10px] mt-0.5">{d.day}</div>
+                  </div>
+                  <div class="w-2 h-2 bg-card border-r border-b border-border rotate-45 mx-auto -mt-1" />
+                </div>
+              </div>
             ))}
           </div>
         </div>

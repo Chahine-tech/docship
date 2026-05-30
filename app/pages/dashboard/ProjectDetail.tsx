@@ -112,7 +112,7 @@ const VersionRow: FC<{ version: Version; slug: string }> = ({ version: v, slug }
   }
   return (
     <li class="flex items-center gap-4 px-6 py-4">
-      <span class={`h-2 w-2 rounded-full shrink-0 ${dots[v.status] ?? dots.ready}`} />
+      <span class={`h-2 w-2 rounded-full shrink-0 transition-colors duration-500 ${dots[v.status] ?? dots.ready}`} />
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2">
           <span class="text-sm font-medium font-mono">{v.tag}</span>

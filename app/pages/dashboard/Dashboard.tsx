@@ -81,7 +81,7 @@ const StatusBadge: FC<{ status: string; tag: string }> = ({ status, tag }) => {
   }
   return (
     <span class={`inline-flex items-center gap-1.5 text-xs font-medium ${colors[status] ?? colors.ready}`}>
-      <span class={`h-1.5 w-1.5 rounded-full ${dots[status] ?? dots.ready}`} />
+      <span class={`h-1.5 w-1.5 rounded-full transition-colors duration-500 \${dots[status] ?? dots.ready}`} />
       {tag}
     </span>
   )

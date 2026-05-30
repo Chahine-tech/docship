@@ -57,7 +57,7 @@ export const Landing: FC = () => (
       </section>
 
       {/* Demo block */}
-      <section class="max-w-3xl mx-auto px-6 pb-20">
+      <section class="max-w-3xl mx-auto px-6 pb-20 reveal">
         <div class="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
           <div class="border-b border-border bg-sidebar px-4 py-2.5 flex items-center gap-2">
             <div class="flex gap-1.5">
@@ -78,7 +78,7 @@ export const Landing: FC = () => (
       </section>
 
       {/* Features grid */}
-      <section id="features" class="max-w-5xl mx-auto px-6 pb-24">
+      <section id="features" class="max-w-5xl mx-auto px-6 pb-24 reveal">
         <h2 class="text-2xl font-bold text-center mb-3">Everything you need. Nothing you don't.</h2>
         <p class="text-center text-muted-foreground mb-12 text-sm">Built for developers who want great docs without the maintenance overhead.</p>
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -107,7 +107,7 @@ export const Landing: FC = () => (
       </section>
 
       {/* How it works */}
-      <section id="how" class="max-w-5xl mx-auto px-6 pb-24">
+      <section id="how" class="max-w-5xl mx-auto px-6 pb-24 reveal">
         <h2 class="text-2xl font-bold text-center mb-3">How it works</h2>
         <p class="text-center text-muted-foreground mb-12 text-sm">Three steps. That's all.</p>
         <div class="grid sm:grid-cols-3 gap-4 relative">
@@ -138,7 +138,7 @@ export const Landing: FC = () => (
       </section>
 
       {/* vs table */}
-      <section class="max-w-4xl mx-auto px-6 pb-24">
+      <section class="max-w-4xl mx-auto px-6 pb-24 reveal">
         <h2 class="text-2xl font-bold text-center mb-12">Why not Docusaurus / GitBook?</h2>
         <div class="rounded-xl border border-border overflow-hidden">
           <table class="w-full text-sm">
@@ -177,7 +177,7 @@ export const Landing: FC = () => (
       </section>
 
       {/* Pricing */}
-      <section class="max-w-4xl mx-auto px-6 pb-24">
+      <section class="max-w-4xl mx-auto px-6 pb-24 reveal">
         <h2 class="text-2xl font-bold text-center mb-3">Simple pricing</h2>
         <p class="text-center text-muted-foreground mb-12 text-sm">Start free. Upgrade when you need more.</p>
         <div class="grid sm:grid-cols-3 gap-4">
@@ -238,7 +238,7 @@ export const Landing: FC = () => (
       </section>
 
       {/* CTA */}
-      <section class="border-t border-border">
+      <section class="border-t border-border reveal">
         <div class="max-w-2xl mx-auto px-6 py-24 text-center">
           <h2 class="text-3xl font-bold mb-4">Ship better docs, faster.</h2>
           <p class="text-muted-foreground mb-8">Free for one project. No credit card required.</p>
@@ -249,6 +249,13 @@ export const Landing: FC = () => (
         </div>
       </section>
 
+      <script dangerouslySetInnerHTML={{ __html: `
+        const observer = new IntersectionObserver(
+          (entries) => entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } }),
+          { threshold: 0.1 }
+        );
+        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+      `}} />
     </body>
   </html>
 )

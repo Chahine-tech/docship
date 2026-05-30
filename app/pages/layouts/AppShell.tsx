@@ -1,7 +1,7 @@
 import type { Child, FC } from 'hono/jsx'
 
 interface Props {
-  user?: { name: string; image?: string | null }
+  user?: { name: string; image?: string | null; plan?: string }
   children?: Child
 }
 
@@ -11,6 +11,15 @@ export const AppShell: FC<Props> = ({ user, children }) => (
       <a href="/dashboard" class="text-sm font-semibold tracking-tight">
         docship
       </a>
+      {user?.plan && (
+        <span class={`ml-2 text-xs px-2 py-0.5 rounded-full font-medium border ${
+          user.plan === 'pro'  ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+          user.plan === 'team' ? 'bg-primary/10 text-primary border-primary/20' :
+                                 'bg-muted text-muted-foreground border-border'
+        }`}>
+          {user.plan}
+        </span>
+      )}
       <div class="flex-1" />
       {user && (
         <div class="flex items-center gap-4">

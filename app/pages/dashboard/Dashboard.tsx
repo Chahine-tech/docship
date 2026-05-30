@@ -12,25 +12,42 @@ interface Project {
 }
 
 interface Props {
-  user: { name: string; image?: string | null }
+  user: { name: string; image?: string | null; plan?: string }
   projects: Project[]
 }
 
-const Dashboard: FC<Props> = ({ user, projects }) => (
+const Dashboard: FC<Props> = ({ user, projects }) => {
+  const atLimit = user.plan === 'free' && projects.length >= 1
+  return (
   <AppShell user={user}>
     <div class="flex items-center justify-between mb-8">
       <div>
         <h1 class="text-2xl font-bold">Projects</h1>
-        <p class="text-muted-foreground text-sm mt-1">
-          {projects.length === 0 ? 'No projects yet' : `${projects.length} project${projects.length > 1 ? 's' : ''}`}
-        </p>
+        <div class="flex items-center gap-3 mt-1">
+          <p class="text-muted-foreground text-sm">
+            {projects.length === 0 ? 'No projects yet' : `${projects.length} project${projects.length > 1 ? 's' : ''}`}
+          </p>
+          {atLimit && (
+            <span class="text-muted-foreground text-sm">·</span>
+          )}
+          {atLimit && (
+            <a
+              href="/billing"
+              class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              You're at the project limit — <span class="underline underline-offset-2">upgrade to add more</span> ↗
+            </a>
+          )}
+        </div>
       </div>
-      <a
-        href="/projects/new"
-        class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-      >
-Connect a repo
-      </a>
+      {!atLimit && (
+        <a
+          href="/projects/new"
+          class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+        >
+          Connect a repo
+        </a>
+      )}
     </div>
 
     {projects.length === 0 ? <EmptyState /> : (
@@ -39,7 +56,8 @@ Connect a repo
       </div>
     )}
   </AppShell>
-)
+  )
+}
 
 export default Dashboard
 

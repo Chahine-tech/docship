@@ -79,6 +79,21 @@ async function getSession(c: Context<AppEnv>) {
   return createAuth(c.env).api.getSession({ headers: c.req.raw.headers })
 }
 
+async function getSessionWithPlan(c: Context<AppEnv>) {
+  const session = await getSession(c)
+  if (!session) return null
+  const planRow = await getDb(c.env.DB)
+    .select({ plan: users.plan })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .get()
+  return { session, plan: (planRow?.plan ?? 'free') as Plan }
+}
+
+function userProp(session: NonNullable<Awaited<ReturnType<typeof getSession>>>, plan: Plan) {
+  return { name: session.user.name, image: session.user.image, plan }
+}
+
 // ─── API ─────────────────────────────────────────────────────────────
 app.all('/api/auth/*', (c) => createAuth(c.env).handler(c.req.raw))
 app.route('/api/projects', projectsRouter)
@@ -120,8 +135,9 @@ app.get('/login/github', async (c) => {
 
 // ─── Dashboard (Inertia — c.render()) ───────────────────────────────
 app.get('/dashboard', async (c) => {
-  const session = await getSession(c)
-  if (!session) return c.redirect('/login')
+  const sp = await getSessionWithPlan(c)
+  if (!sp) return c.redirect('/login')
+  const { session, plan } = sp
 
   const db = getDb(c.env.DB)
   const rows = await db.select().from(projects).where(eq(projects.userId, session.user.id)).all()
@@ -138,7 +154,7 @@ app.get('/dashboard', async (c) => {
   )
 
   return c.render('dashboard/Dashboard', {
-    user: { name: session.user.name, image: session.user.image },
+    user: userProp(session, plan),
     projects: enriched,
   })
 })
@@ -161,9 +177,10 @@ app.get('/billing', async (c) => {
       .get(),
   ])
 
+  const billingPlan = (user?.plan ?? 'free') as Plan
   return c.render('dashboard/Billing', {
-    user: { name: session.user.name, image: session.user.image },
-    currentPlan: (user?.plan ?? 'free') as Plan,
+    user: userProp(session, billingPlan),
+    currentPlan: billingPlan,
     projectCount: projectCountRow?.total ?? 0,
     hasSubscription: !!user?.stripeSubscriptionId,
     success: c.req.query('success') === '1',
@@ -171,10 +188,24 @@ app.get('/billing', async (c) => {
 })
 
 app.get('/projects/new', async (c) => {
-  const session = await getSession(c)
-  if (!session) return c.redirect('/login')
+  const sp = await getSessionWithPlan(c)
+  if (!sp) return c.redirect('/login')
+  const { session, plan } = sp
 
   const db = getDb(c.env.DB)
+
+  // Redirect free users who already hit the limit
+  if (PLAN_LIMITS[plan].projects !== Infinity) {
+    const projectCount = await db
+      .select({ total: count(projects.id) })
+      .from(projects)
+      .where(eq(projects.userId, session.user.id))
+      .get()
+    if ((projectCount?.total ?? 0) >= PLAN_LIMITS[plan].projects) {
+      return c.redirect('/billing?limit=projects')
+    }
+  }
+
   const account = await db
     .select({ accessToken: accounts.accessToken })
     .from(accounts)
@@ -197,7 +228,7 @@ app.get('/projects/new', async (c) => {
   }
 
   return c.render('dashboard/NewProject', {
-    user: { name: session.user.name, image: session.user.image },
+    user: userProp(session, plan),
     repos,
   })
 })
@@ -244,7 +275,7 @@ app.post('/projects/new', async (c) => {
       Object.entries(result.error.flatten().fieldErrors).map(([k, v]) => [k, v?.[0] ?? ''])
     )
     return c.render('dashboard/NewProject', {
-      user: { name: session.user.name, image: session.user.image },
+      user: userProp(session, plan),
       repos: [],
       errors,
       values: raw,
@@ -254,7 +285,7 @@ app.post('/projects/new', async (c) => {
   const existing = await db.select({ id: projects.id }).from(projects).where(eq(projects.slug, result.data.slug)).get()
   if (existing) {
     return c.render('dashboard/NewProject', {
-      user: { name: session.user.name, image: session.user.image },
+      user: userProp(session, plan),
       repos: [],
       errors: { slug: 'Slug already taken' },
       values: raw,
@@ -271,8 +302,9 @@ app.post('/projects/new', async (c) => {
 })
 
 app.get('/projects/:id', async (c) => {
-  const session = await getSession(c)
-  if (!session) return c.redirect('/login')
+  const sp = await getSessionWithPlan(c)
+  if (!sp) return c.redirect('/login')
+  const { session, plan } = sp
 
   const db = getDb(c.env.DB)
   const project = await db
@@ -285,7 +317,7 @@ app.get('/projects/:id', async (c) => {
   const versions = await db.select().from(docVersions).where(eq(docVersions.projectId, project.id)).all()
 
   return c.render('dashboard/ProjectDetail', {
-    user: { name: session.user.name, image: session.user.image },
+    user: userProp(session, plan),
     project,
     versions,
   })
@@ -299,8 +331,9 @@ const settingsSchema = z.object({
 })
 
 app.get('/projects/:id/settings', async (c) => {
-  const session = await getSession(c)
-  if (!session) return c.redirect('/login')
+  const sp = await getSessionWithPlan(c)
+  if (!sp) return c.redirect('/login')
+  const { session, plan } = sp
 
   const db = getDb(c.env.DB)
   const project = await db
@@ -311,14 +344,15 @@ app.get('/projects/:id/settings', async (c) => {
   if (!project) return c.notFound()
 
   return c.render('dashboard/ProjectSettings', {
-    user: { name: session.user.name, image: session.user.image },
+    user: userProp(session, plan),
     project,
   })
 })
 
 app.post('/projects/:id/settings', async (c) => {
-  const session = await getSession(c)
-  if (!session) return c.redirect('/login')
+  const sp = await getSessionWithPlan(c)
+  if (!sp) return c.redirect('/login')
+  const { session, plan } = sp
 
   const db = getDb(c.env.DB)
   const project = await db
@@ -337,7 +371,7 @@ app.post('/projects/:id/settings', async (c) => {
       Object.entries(result.error.flatten().fieldErrors).map(([k, v]) => [k, v?.[0] ?? ''])
     )
     return c.render('dashboard/ProjectSettings', {
-      user: { name: session.user.name, image: session.user.image },
+      user: userProp(session, plan),
       project,
       errors,
     })
@@ -353,15 +387,16 @@ app.post('/projects/:id/settings', async (c) => {
   await db.update(projects).set(updated).where(eq(projects.id, project.id))
 
   return c.render('dashboard/ProjectSettings', {
-    user: { name: session.user.name, image: session.user.image },
+    user: userProp(session, plan),
     project: { ...project, ...updated },
     success: true,
   })
 })
 
 app.get('/projects/:id/analytics', async (c) => {
-  const session = await getSession(c)
-  if (!session) return c.redirect('/login')
+  const sp = await getSessionWithPlan(c)
+  if (!sp) return c.redirect('/login')
+  const { session, plan } = sp
 
   const db = getDb(c.env.DB)
   const project = await db
@@ -409,7 +444,7 @@ app.get('/projects/:id/analytics', async (c) => {
   ])
 
   return c.render('dashboard/Analytics', {
-    user: { name: session.user.name, image: session.user.image },
+    user: userProp(session, plan),
     project,
     stats: {
       totalViews: totalViewsRow?.total ?? 0,

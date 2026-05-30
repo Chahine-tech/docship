@@ -1,3 +1,4 @@
+import { withSentry, captureException } from '@sentry/cloudflare'
 import { Hono } from 'hono'
 import { inertia } from '@hono/inertia'
 import { zValidator } from '@hono/zod-validator'
@@ -8,7 +9,7 @@ import { createAuth } from './auth'
 import { getDb } from './db/client'
 import { projects, docVersions, pageViews, searchEvents, users } from './db/schema'
 import { eq, and, gt, count, desc, sql } from 'drizzle-orm'
-import type { Plan } from './types'
+import type { Plan, Env } from './types'
 import { PLAN_LIMITS } from './types'
 import { projectsRouter } from './routes/api/projects'
 import { billingRouter } from './routes/api/billing'
@@ -26,6 +27,22 @@ import { DocsLayout } from './pages/layouts/DocsLayout'
 import type { AppEnv, NavItem } from './types'
 
 const app = new Hono<AppEnv>()
+
+// Security headers on every response
+app.use('*', async (c, next) => {
+  await next()
+  c.res.headers.set('X-Content-Type-Options', 'nosniff')
+  c.res.headers.set('X-Frame-Options', 'SAMEORIGIN')
+  c.res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  c.res.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+})
+
+// Unhandled errors → Sentry
+app.onError((err, c) => {
+  captureException(err)
+  console.error(err)
+  return c.json({ error: 'Internal server error' }, 500)
+})
 
 // Custom domain middleware — rewrite requests from custom domains to /docs/{slug}/...
 app.use('*', async (c, next) => {
@@ -553,8 +570,14 @@ app.get('/docs/:slug/:version/*', async (c) => {
     )
   }
 
+  const isPrivate = project?.isPrivate ?? false
   return new Response('<!DOCTYPE html>' + html, {
-    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': isPrivate
+        ? 'private, no-store'
+        : 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400',
+    },
   })
 })
 
@@ -598,4 +621,14 @@ function buildFtsQuery(q: string): string {
     .join(' ')
 }
 
-export default { fetch: app.fetch, queue }
+export default withSentry(
+  (env) => {
+    const e = env as unknown as Env
+    return {
+      dsn: e.SENTRY_DSN,
+      tracesSampleRate: 0.1,
+      environment: e.APP_URL?.includes('localhost') ? 'development' : 'production',
+    }
+  },
+  { fetch: app.fetch, queue: queue as ExportedHandlerQueueHandler }
+)

@@ -19,6 +19,7 @@ export interface Env {
   STRIPE_WEBHOOK_SECRET: string
   STRIPE_PRO_PRICE_ID: string
   STRIPE_TEAM_PRICE_ID: string
+  SENTRY_DSN: string
 }
 
 export interface BuildJob {

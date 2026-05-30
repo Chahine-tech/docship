@@ -20,6 +20,7 @@
     "@hono/inertia": "^0.2.0",
     "@hono/zod-validator": "^0.7.6",
     "@inertiajs/core": "^3.0.3",
+    "@sentry/cloudflare": "^10.55.0",
     "@ts-76/inertia-hono-jsx": "^0.2.3",
     "better-auth": "^1.6.11",
     "drizzle-orm": "^0.45.2",
